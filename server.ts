@@ -70,6 +70,34 @@ const MAX_LOGS = 1000;
 const activeProcesses = new Map<string, ChildProcess>();
 const botLogsMap = new Map<string, LogItem[]>();
 const startTimes = new Map<string, Date>();
+const startingBots = new Set<string>();
+const botRestartTimeouts = new Map<string, NodeJS.Timeout>();
+
+// Robust kill function to ensure no orphan or duplicate bot processes run simultaneously
+function killBotProcesses(botId: string, botDir: string) {
+  if (botRestartTimeouts.has(botId)) {
+    clearTimeout(botRestartTimeouts.get(botId)!);
+    botRestartTimeouts.delete(botId);
+  }
+  const proc = activeProcesses.get(botId);
+  if (proc) {
+    try { proc.kill("SIGKILL"); } catch {}
+    activeProcesses.delete(botId);
+  }
+  startTimes.delete(botId);
+  try {
+    execSync(`pkill -9 -f "${botDir}" || true`);
+  } catch {}
+  try {
+    const output = execSync(`ls -l /proc/*/cwd 2>/dev/null | grep "${botDir}" | awk '{print $9}' | cut -d/ -f3 || true`).toString();
+    for (const pidStr of output.trim().split(/\s+/)) {
+      const pid = parseInt(pidStr, 10);
+      if (!isNaN(pid) && pid > 0 && pid !== process.pid) {
+        try { process.kill(pid, "SIGKILL"); } catch {}
+      }
+    }
+  } catch {}
+}
 let hostedBots: HostedBot[] = [];
 let accounts: Account[] = [];
 const sessions = new Map<string, { userId: string; expiresAt: number }>();
@@ -328,7 +356,7 @@ function initHostedBots() {
 // 24/7 Autonomous Watchdog: Periodically monitors processes and restarts any crashed bot
 setInterval(() => {
   for (const bot of hostedBots) {
-    if (bot.autoRestart) {
+    if (bot.autoRestart && bot.status !== 'error' && !startingBots.has(bot.id) && !botRestartTimeouts.has(bot.id)) {
       const proc = activeProcesses.get(bot.id);
       if (!proc || proc.killed || proc.exitCode !== null) {
         // Bot should be running, recover it!
@@ -542,34 +570,31 @@ function ensureBotDependencies(botDir: string, botId: string): void {
 }
 
 // Start a bot process (24/7 background execution)
-function startBot(botId: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const bot = hostedBots.find(b => b.id === botId);
-    if (!bot) {
-      resolve(false);
-      return;
-    }
+async function startBot(botId: string): Promise<boolean> {
+  const bot = hostedBots.find(b => b.id === botId);
+  if (!bot) {
+    return false;
+  }
 
+  if (startingBots.has(botId)) {
+    return false;
+  }
+  startingBots.add(botId);
+
+  try {
     const botDir = path.join(HOSTED_BOTS_DIR, bot.id);
     if (!fs.existsSync(botDir)) {
       addBotLog(botId, 'error', `Directory not found: ${botDir}`);
       bot.status = 'error';
       bot.error = "Bot directory missing";
-      resolve(false);
-      return;
+      startingBots.delete(botId);
+      return false;
     }
 
     // Kill any existing/orphaned processes running inside this botDir to prevent Telegram Conflict errors
-    try {
-      execSync(`pkill -9 -f "${botDir}" || true`);
-    } catch {}
-
-    const existingProc = activeProcesses.get(botId);
-    if (existingProc && !existingProc.killed) {
-      try { existingProc.kill("SIGKILL"); } catch {}
-      activeProcesses.delete(botId);
-      startTimes.delete(botId);
-    }
+    killBotProcesses(botId, botDir);
+    // Allow brief OS pause for Telegram socket cleanup
+    await new Promise(r => setTimeout(r, 600));
 
     let entryFile = bot.entryFile;
     let scriptPath = path.join(botDir, entryFile);
@@ -595,8 +620,8 @@ function startBot(botId: string): Promise<boolean> {
           addBotLog(botId, 'error', `Entry script not found: ${bot.entryFile}`);
           bot.status = 'error';
           bot.error = `Entry script ${bot.entryFile} not found`;
-          resolve(false);
-          return;
+          startingBots.delete(botId);
+          return false;
         }
       }
     }
@@ -604,7 +629,41 @@ function startBot(botId: string): Promise<boolean> {
     // Auto-patch bot code and services
     patchAndValidateBotCode(botDir, botId, bot.env?.BASE_URL, bot.env?.API_KEY, bot.token);
 
-    // Auto dependency check
+    // Pre-flight Python syntax verification & auto-repair
+    try {
+      execSync(`python3 -m py_compile "${scriptPath}"`, { stdio: "pipe" });
+    } catch (compileErr: any) {
+      let codeContent = fs.readFileSync(scriptPath, "utf-8");
+      let wasRepaired = false;
+      // 1. Repair missing url= in InlineKeyboardButton("...", https://...
+      if (/InlineKeyboardButton\([^)]*,\s*https?:\/\//.test(codeContent)) {
+        codeContent = codeContent.replace(/(InlineKeyboardButton\([^,]+,\s*)(https?:\/\/[^",\s)]+)/g, '$1url="$2"');
+        wasRepaired = true;
+      }
+      // 2. Repair missing opening quote before url in button
+      if (/InlineKeyboardButton\([^)]*,\s*https?:\/\/.*?"\s*,/i.test(codeContent)) {
+        codeContent = codeContent.replace(/(InlineKeyboardButton\([^,]+,\s*)https?:\/\/([^",\s]+)"/g, '$1url="https://$2"');
+        wasRepaired = true;
+      }
+      if (wasRepaired) {
+        fs.writeFileSync(scriptPath, codeContent, "utf-8");
+        addBotLog(botId, 'system', `🔧 বাটনের সিনট্যাক্স স্বয়ংক্রিয়ভাবে ঠিক করা হয়েছে (Auto-repaired button URL syntax).`);
+      }
+      try {
+        execSync(`python3 -m py_compile "${scriptPath}"`, { stdio: "pipe" });
+      } catch (errFinal: any) {
+        const errLines = (errFinal.stderr?.toString() || errFinal.stdout?.toString() || errFinal.message).trim();
+        addBotLog(botId, 'error', `❌ পাইথন স্ক্রিপ্ট সিনট্যাক্স এরর (SyntaxError):\n${errLines}\n\nঅনুগ্রহ করে কোড এডিটরে গিয়ে এই লাইনটির ভুল সংশোধন করুন।`);
+        bot.status = 'error';
+        bot.error = "SyntaxError in python script";
+        bot.autoRestart = false; // Stop crash loop on syntax errors
+        saveRegistry();
+        startingBots.delete(botId);
+        return false;
+      }
+    }
+
+    // Auto dependency check in background
     ensureBotDependencies(botDir, botId);
 
     bot.status = 'starting';
@@ -619,132 +678,144 @@ function startBot(botId: string): Promise<boolean> {
       ...(bot.env || {})
     };
 
-    try {
-      const proc = spawn("python3", [entryFile], {
-        cwd: botDir,
-        env: botEnv,
-        detached: false
-      });
+    const proc = spawn("python3", [scriptPath], {
+      cwd: botDir,
+      env: botEnv,
+      detached: false
+    });
 
-      activeProcesses.set(botId, proc);
-      startTimes.set(botId, new Date());
-      bot.pid = proc.pid || null;
-      bot.status = 'running';
-      bot.startTime = new Date().toISOString();
-      bot.error = undefined;
-      bot.autoRestart = true; // Ensure auto-restart is enabled for 24/7 persistence
-      saveRegistry();
+    activeProcesses.set(botId, proc);
+    startTimes.set(botId, new Date());
+    bot.pid = proc.pid || null;
+    bot.status = 'running';
+    bot.startTime = new Date().toISOString();
+    bot.error = undefined;
+    bot.autoRestart = true; // Ensure auto-restart is enabled for 24/7 persistence
+    saveRegistry();
 
-      proc.stdout?.on("data", (data) => {
-        const text = data.toString();
-        const lines = text.split("\n");
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          let level: LogItem['level'] = 'info';
-          if (line.includes('OTP') || line.includes('SUCCESSFUL')) level = 'otp';
-          else if (line.includes('ERROR') || line.includes('Fail') || line.includes('Traceback')) level = 'error';
-          else if (line.includes('WARNING') || line.includes('WARN')) level = 'warn';
-          addBotLog(botId, level, line);
-        }
-      });
+    proc.stdout?.on("data", (data) => {
+      const text = data.toString();
+      const lines = text.split("\n");
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        let level: LogItem['level'] = 'info';
+        if (line.includes('OTP') || line.includes('SUCCESSFUL')) level = 'otp';
+        else if (line.includes('ERROR') || line.includes('Fail') || line.includes('Traceback')) level = 'error';
+        else if (line.includes('WARNING') || line.includes('WARN')) level = 'warn';
+        addBotLog(botId, level, line);
+      }
+    });
 
-      proc.stderr?.on("data", (data) => {
-        const text = data.toString();
-        const lines = text.split("\n");
-        for (const line of lines) {
-          if (!line.trim()) continue;
+    proc.stderr?.on("data", (data) => {
+      const text = data.toString();
+      const lines = text.split("\n");
+      for (const line of lines) {
+        if (!line.trim()) continue;
 
-          // 1. Detect Telegram Polling Conflict
-          if (line.includes('telegram.error.Conflict') || line.includes('terminated by other getUpdates request')) {
-            addBotLog(botId, 'warn', `⚠️ টেলিগ্রাম কনফ্লিক্ট শনাক্ত: পূর্ববর্তী সেশন এখনও কানেক্টেড থাকতে পারে। সমস্ত ডুপ্লিকেট বন্ধ করে ৩ সেকেন্ড পর ফ্রেশ রিস্টার্ট করা হচ্ছে...`);
-            try {
-              execSync(`pkill -9 -f "${botDir}" || true`);
-            } catch {}
-            setTimeout(() => {
+        // 1. Detect Telegram Polling Conflict
+        if (line.includes('telegram.error.Conflict') || line.includes('terminated by other getUpdates request')) {
+          addBotLog(botId, 'warn', `⚠️ টেলিগ্রাম কনফ্লিক্ট: অন্য কোনো ডিভাইস বা সেশনে এই বট টোকেন চালু থাকতে পারে। সমস্ত প্রসেস বন্ধ করে ৫ সেকেন্ড পর ফ্রেশ রিস্টার্ট করা হচ্ছে...`);
+          try { proc.kill("SIGKILL"); } catch {}
+          killBotProcesses(botId, botDir);
+          if (bot.autoRestart) {
+            if (botRestartTimeouts.has(botId)) {
+              clearTimeout(botRestartTimeouts.get(botId)!);
+            }
+            const t = setTimeout(() => {
+              botRestartTimeouts.delete(botId);
               if (bot.autoRestart && !activeProcesses.has(botId)) {
                 startBot(botId);
               }
-            }, 3000);
-            continue;
+            }, 5000);
+            botRestartTimeouts.set(botId, t);
           }
+          return;
+        }
 
-          addBotLog(botId, 'error', line);
+        addBotLog(botId, 'error', line);
 
-          // 2. Auto-install missing module or package
-          let pkgToInstall: string | null = null;
-          const modMatch = line.match(/No module named ['"]([^'"]+)['"]/);
-          const pkgNotInstalledMatch = line.match(/the ['"]([a-zA-Z0-9_\-]+)['"] package is not installed/i);
-          const pipHintMatch = line.match(/pip install ([a-zA-Z0-9_\-\[\]]+)/i);
+        // 2. Auto-install missing module or package
+        let pkgToInstall: string | null = null;
+        const modMatch = line.match(/No module named ['"]([^'"]+)['"]/);
+        const pkgNotInstalledMatch = line.match(/the ['"]([a-zA-Z0-9_\-]+)['"] package is not installed/i);
+        const pipHintMatch = line.match(/pip install ([a-zA-Z0-9_\-\[\]]+)/i);
 
-          if (modMatch && modMatch[1]) {
-            const missingMod = modMatch[1];
-            const pkgMap: Record<string, string> = {
-              'telebot': 'pyTelegramBotAPI',
-              'PIL': 'pillow',
-              'bs4': 'beautifulsoup4',
-              'dotenv': 'python-dotenv',
-              'telegram': 'python-telegram-bot>=20.0',
-              'dateutil': 'python-dateutil',
-              'jwt': 'PyJWT',
-              'cv2': 'opencv-python'
-            };
-            pkgToInstall = pkgMap[missingMod] || missingMod;
-          } else if (pkgNotInstalledMatch && pkgNotInstalledMatch[1]) {
-            pkgToInstall = pkgNotInstalledMatch[1];
-          } else if (pipHintMatch && pipHintMatch[1]) {
-            pkgToInstall = pipHintMatch[1];
-          }
+        if (modMatch && modMatch[1]) {
+          const missingMod = modMatch[1];
+          const pkgMap: Record<string, string> = {
+            'telebot': 'pyTelegramBotAPI',
+            'PIL': 'pillow',
+            'bs4': 'beautifulsoup4',
+            'dotenv': 'python-dotenv',
+            'telegram': 'python-telegram-bot>=20.0',
+            'dateutil': 'python-dateutil',
+            'jwt': 'PyJWT',
+            'cv2': 'opencv-python',
+            'pyotp': 'pyotp'
+          };
+          pkgToInstall = pkgMap[missingMod] || missingMod;
+        } else if (pkgNotInstalledMatch && pkgNotInstalledMatch[1]) {
+          pkgToInstall = pkgNotInstalledMatch[1];
+        } else if (pipHintMatch && pipHintMatch[1]) {
+          pkgToInstall = pipHintMatch[1];
+        }
 
-          if (pkgToInstall) {
-            addBotLog(botId, 'system', `📦 অটো-ইনস্টল করা হচ্ছে প্রয়োজনীয় প্যাকেজ '${pkgToInstall}'...`);
-            try {
-              execSync(`python3 -m pip install ${pkgToInstall} --break-system-packages`, { timeout: 45000, stdio: "ignore" });
-              addBotLog(botId, 'system', `✅ '${pkgToInstall}' ইনস্টলেশন সফল! বট রিস্টার্ট করা হচ্ছে...`);
-              setTimeout(() => {
-                restartBot(botId);
-              }, 1500);
-            } catch (err: any) {
-              addBotLog(botId, 'error', `ইনস্টল করতে ব্যর্থ: ${err.message}`);
-            }
+        if (pkgToInstall) {
+          addBotLog(botId, 'system', `📦 অটো-ইনস্টল করা হচ্ছে প্রয়োজনীয় প্যাকেজ '${pkgToInstall}'...`);
+          try {
+            execSync(`python3 -m pip install ${pkgToInstall} --break-system-packages`, { timeout: 45000, stdio: "ignore" });
+            addBotLog(botId, 'system', `✅ '${pkgToInstall}' ইনস্টলেশন সফল! বট রিস্টার্ট করা হচ্ছে...`);
+            setTimeout(() => {
+              restartBot(botId);
+            }, 1500);
+          } catch (err: any) {
+            addBotLog(botId, 'error', `ইনস্টল করতে ব্যর্থ: ${err.message}`);
           }
         }
-      });
+      }
+    });
 
-      proc.on("error", (err) => {
-        addBotLog(botId, 'error', `Process execution error: ${err.message}`);
-        bot.status = 'error';
-        bot.error = err.message;
-      });
-
-      proc.on("close", (code, signal) => {
-        addBotLog(botId, 'system', `Process stopped (exit code: ${code ?? signal})`);
-        activeProcesses.delete(botId);
-        startTimes.delete(botId);
-        bot.pid = null;
-        bot.startTime = null;
-
-        if (bot.autoRestart) {
-          // 24/7 Anti-Offline: auto restart after 3 seconds
-          addBotLog(botId, 'warn', `⚡ 24/7 Watchdog: Auto-restarting in 3 seconds to keep bot online...`);
-          setTimeout(() => {
-            if (bot.autoRestart && !activeProcesses.has(botId)) {
-              startBot(botId);
-            }
-          }, 3000);
-        } else {
-          bot.status = 'stopped';
-          saveRegistry();
-        }
-      });
-
-      resolve(true);
-    } catch (err: any) {
-      addBotLog(botId, 'error', `Failed to spawn python process: ${err.message}`);
+    proc.on("error", (err) => {
+      addBotLog(botId, 'error', `Process execution error: ${err.message}`);
       bot.status = 'error';
       bot.error = err.message;
-      resolve(false);
-    }
-  });
+    });
+
+    proc.on("close", (code, signal) => {
+      addBotLog(botId, 'system', `Process stopped (exit code: ${code ?? signal})`);
+      activeProcesses.delete(botId);
+      startTimes.delete(botId);
+      bot.pid = null;
+      bot.startTime = null;
+
+      if (bot.autoRestart) {
+        // 24/7 Anti-Offline: auto restart after 3 seconds (debounced)
+        addBotLog(botId, 'warn', `⚡ 24/7 Watchdog: Auto-restarting in 3 seconds to keep bot online...`);
+        if (botRestartTimeouts.has(botId)) {
+          clearTimeout(botRestartTimeouts.get(botId)!);
+        }
+        const t = setTimeout(() => {
+          botRestartTimeouts.delete(botId);
+          if (bot.autoRestart && !activeProcesses.has(botId)) {
+            startBot(botId);
+          }
+        }, 3000);
+        botRestartTimeouts.set(botId, t);
+      } else {
+        bot.status = 'stopped';
+        saveRegistry();
+      }
+    });
+
+    return true;
+  } catch (err: any) {
+    addBotLog(botId, 'error', `Failed to spawn python process: ${err.message}`);
+    bot.status = 'error';
+    bot.error = err.message;
+    return false;
+  } finally {
+    startingBots.delete(botId);
+  }
 }
 
 // Stop a bot process
@@ -754,39 +825,21 @@ function stopBot(botId: string): Promise<boolean> {
     if (bot) {
       bot.autoRestart = false; // Disable auto-restart when user manually clicks Stop
       bot.status = 'stopped';
+      bot.pid = null;
+      bot.startTime = null;
       saveRegistry();
       const botDir = path.join(HOSTED_BOTS_DIR, bot.id);
-      try { execSync(`pkill -9 -f "${botDir}" || true`); } catch {}
-    }
-    const proc = activeProcesses.get(botId);
-    if (!proc || proc.killed) {
-      activeProcesses.delete(botId);
-      startTimes.delete(botId);
-      if (bot) {
-        bot.status = 'stopped';
-        bot.pid = null;
-        bot.startTime = null;
-      }
-      resolve(true);
-      return;
-    }
-
-    addBotLog(botId, 'system', `Stopping bot process (PID: ${proc.pid})...`);
-    proc.kill("SIGTERM");
-    setTimeout(() => {
-      if (proc && !proc.killed) {
+      killBotProcesses(botId, botDir);
+    } else {
+      const proc = activeProcesses.get(botId);
+      if (proc) {
         try { proc.kill("SIGKILL"); } catch {}
+        activeProcesses.delete(botId);
       }
-      activeProcesses.delete(botId);
       startTimes.delete(botId);
-      if (bot) {
-        bot.status = 'stopped';
-        bot.pid = null;
-        bot.startTime = null;
-      }
-      addBotLog(botId, 'system', `Bot process stopped.`);
-      resolve(true);
-    }, 1000);
+    }
+    addBotLog(botId, 'system', `Bot process stopped.`);
+    resolve(true);
   });
 }
 

@@ -1,5 +1,20 @@
 [
   {
+    "id": "otpzonejk-bot-0jznn",
+    "name": "@OtpZoneJK_bot",
+    "entryFile": "bot.py",
+    "ownerId": "usr_1788725022598_c055ffa3",
+    "ownerName": "Toyobur Rahman",
+    "token": "8814477083:AAH_G8v9gg3YRyVUyYvVRZ65Y_ZIT2nffJM",
+    "botUsername": "OtpZoneJK_bot",
+    "status": "running",
+    "createdAt": "2026-09-06T21:15:39.952Z",
+    "autoRestart": true,
+    "env": {
+      "BASE_URL": "https://minosms.com"
+    }
+  },
+  {
     "id": "fast-live-bot-dmc1u",
     "name": "Fast Live Bot",
     "entryFile": "bot.py",
