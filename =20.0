@@ -1,8 +1,0 @@
-Requirement already satisfied: python-telegram-bot in /usr/local/lib/python3.11/dist-packages (22.8)
-Requirement already satisfied: httpx<0.29,>=0.27 in /usr/local/lib/python3.11/dist-packages (from python-telegram-bot) (0.28.1)
-Requirement already satisfied: anyio in /usr/local/lib/python3.11/dist-packages (from httpx<0.29,>=0.27->python-telegram-bot) (4.15.1)
-Requirement already satisfied: certifi in /usr/local/lib/python3.11/dist-packages (from httpx<0.29,>=0.27->python-telegram-bot) (2026.7.22)
-Requirement already satisfied: httpcore==1.* in /usr/local/lib/python3.11/dist-packages (from httpx<0.29,>=0.27->python-telegram-bot) (1.0.9)
-Requirement already satisfied: idna in /usr/local/lib/python3.11/dist-packages (from httpx<0.29,>=0.27->python-telegram-bot) (3.19)
-Requirement already satisfied: h11>=0.16 in /usr/local/lib/python3.11/dist-packages (from httpcore==1.*->httpx<0.29,>=0.27->python-telegram-bot) (0.16.0)
-Requirement already satisfied: typing_extensions>=4.16.0 in /usr/local/lib/python3.11/dist-packages (from anyio->httpx<0.29,>=0.27->python-telegram-bot) (4.16.0)

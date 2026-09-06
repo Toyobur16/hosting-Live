@@ -2,6 +2,8 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
+  isVerified?: boolean;
+  verificationToken?: string;
   createdAt: string;
 }
 

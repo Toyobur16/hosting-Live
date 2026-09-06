@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Lock, Mail, Shield, AlertCircle, X, LogIn, UserPlus, CheckCircle2 } from 'lucide-react';
+import { Bot, User, Lock, Mail, Eye, EyeOff, ShieldCheck, CheckCircle2, AlertCircle, X, ExternalLink, ArrowRight, RefreshCw } from 'lucide-react';
 import { AuthUser } from '../types';
 
 interface AuthModalProps {
@@ -17,13 +17,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   canDismiss = false,
   lang = 'bn'
 }) => {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'register' | 'login'>('register');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Cloudflare Turnstile state
+  const [turnstileVerified, setTurnstileVerified] = useState(true);
+
+  // Email Verification Screen State
+  const [verificationPending, setVerificationPending] = useState(false);
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
+  const [verificationLink, setVerificationLink] = useState<string | null>(null);
+  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [registeredName, setRegisteredName] = useState('');
+  const [emailDelivered, setEmailDelivered] = useState(false);
+  const [activating, setActivating] = useState(false);
+  const [activationSuccess, setActivationSuccess] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -31,25 +47,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     setError(null);
 
-    if (mode === 'register') {
-      if (!name.trim()) {
-        setError(lang === 'bn' ? 'অনুগ্রহ করে আপনার নাম লিখুন' : 'Please enter your full name');
-        return;
-      }
-      if (password !== confirmPassword) {
-        setError(lang === 'bn' ? 'পাসওয়ার্ড এবং কনফার্ম পাসওয়ার্ড মিলছে না' : 'Passwords do not match');
-        return;
-      }
-      if (password.length < 6) {
-        setError(lang === 'bn' ? 'পাসওয়ার্ড ন্যূনতম ৬ অক্ষরের হতে হবে' : 'Password must be at least 6 characters');
-        return;
-      }
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setError(lang === 'bn' ? 'সঠিক ইমেইল অ্যাড্রেস প্রদান করুন' : 'Please enter a valid email address');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError(lang === 'bn' ? 'পাসওয়ার্ড ন্যূনতম ৬ অক্ষরের হতে হবে' : 'Password must be at least 6 characters');
+      return;
+    }
+
+    if (mode === 'register' && !name.trim()) {
+      setError(lang === 'bn' ? 'আপনার নাম লিখুন' : 'Please enter your full name');
+      return;
     }
 
     setLoading(true);
     try {
       const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
-      const body = mode === 'register' ? { name: name.trim(), email: email.trim(), password } : { email: email.trim(), password };
+      const body = mode === 'register'
+        ? { name: name.trim(), email: cleanEmail, password }
+        : { email: cleanEmail, password };
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -62,9 +81,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         throw new Error(data.error || (lang === 'bn' ? 'ব্যর্থ হয়েছে, পুনরায় চেষ্টা করুন' : 'Authentication failed'));
       }
 
+      // Save persistent token
       localStorage.setItem('bot_auth_token', data.token);
-      onSuccess(data.user, data.token);
-      if (onClose) onClose();
+
+      if (mode === 'register') {
+        // Show the Email Verification screen as requested
+        setRegisteredEmail(cleanEmail);
+        setRegisteredName(name.trim());
+        setVerificationToken(data.verificationToken || null);
+        setVerificationLink(data.verificationLink || null);
+        setEmailDelivered(Boolean(data.emailSent));
+        setVerificationPending(true);
+      } else {
+        // Logged in
+        onSuccess(data.user, data.token);
+        if (onClose) onClose();
+      }
     } catch (err: any) {
       setError(err.message || 'Error occurred');
     } finally {
@@ -72,226 +104,369 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const fillDemoAccount = (demoName: string, demoEmail: string) => {
-    setName(demoName);
-    setEmail(demoEmail);
-    setPassword('123456');
-    setConfirmPassword('123456');
+  // Immediate in-app verification handler
+  const handleActivateAccount = async () => {
+    if (!verificationToken) {
+      setError(lang === 'bn' ? 'ভেরিফিকেশন টোকেন পাওয়া যায়নি' : 'Verification token not found');
+      return;
+    }
+    setActivating(true);
     setError(null);
+    try {
+      const res = await fetch('/api/auth/verify-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: verificationToken })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Verification failed');
+      }
+
+      setActivationSuccess(true);
+      setTimeout(() => {
+        const token = localStorage.getItem('bot_auth_token') || '';
+        onSuccess(data.user, token);
+        if (onClose) onClose();
+      }, 1200);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  // Resend verification email
+  const handleResendEmail = async () => {
+    setResending(true);
+    setResendMessage(null);
+    setError(null);
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: registeredEmail })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to resend');
+      }
+      setResendMessage(lang === 'bn' ? 'ভেরিফিকেশন লিঙ্ক আবার পাঠানো হয়েছে!' : 'Verification email resent!');
+      if (data.verificationToken) {
+        setVerificationToken(data.verificationToken);
+      }
+      if (data.verificationLink) {
+        setVerificationLink(data.verificationLink);
+      }
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setResending(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl border border-[#e2e8f0] shadow-2xl max-w-md w-full overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-[#0088cc] to-[#006699] p-6 text-white relative">
-          {canDismiss && onClose && (
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#050811]/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-[#111927] border border-[#1f2c42] shadow-2xl rounded-3xl max-w-[420px] w-full p-7 text-white relative overflow-hidden">
+        {/* Subtle Top Ambient Glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-60 h-24 bg-gradient-to-b from-fuchsia-500/15 via-pink-500/10 to-transparent blur-2xl pointer-events-none" />
 
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-white" />
+        {canDismiss && onClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-xl hover:bg-slate-800 transition-colors z-10"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* ================= EMAIL VERIFICATION SCREEN ================= */}
+        {verificationPending ? (
+          <div className="text-center py-2 space-y-4">
+            {/* Glowing Mail Icon */}
+            <div className="w-16 h-16 rounded-2xl bg-[#1e293b] border border-[#334155] flex items-center justify-center mx-auto shadow-lg shadow-pink-500/10 text-pink-400">
+              <Mail className="w-8 h-8" />
             </div>
+
             <div>
-              <h2 className="text-lg font-bold">
-                {mode === 'login'
-                  ? lang === 'bn'
-                    ? 'ইউজার লগইন'
-                    : 'User Sign In'
-                  : lang === 'bn'
-                  ? 'নতুন একাউন্ট রেজিস্টার'
-                  : 'Create Account'}
+              <h2 className="text-xl font-bold text-white">
+                {lang === 'bn' ? 'অ্যাকাউন্ট অ্যাক্টিভ করুন' : 'Verify Your Account'}
               </h2>
-              <p className="text-xs text-white/80">
+              <p className="text-xs text-slate-400 mt-1">
                 {lang === 'bn'
-                  ? 'ব্যক্তিগত ও সুরক্ষিত টেলিগ্রাম বট হোস্টিং'
-                  : 'Private & Isolated Telegram Bot Hosting'}
+                  ? 'আমরা আপনার ইমেইলে একটি ভেরিফিকেশন লিঙ্ক পাঠিয়েছি:'
+                  : 'We sent a verification link to your email:'}
+              </p>
+              <div className="mt-2 inline-block px-3 py-1 bg-[#1a253b] border border-[#2b3c5e] rounded-xl text-xs font-semibold text-pink-300">
+                {registeredEmail}
+              </div>
+            </div>
+
+            {error && (
+              <div className="p-3 bg-rose-950/40 border border-rose-800/60 rounded-xl text-rose-300 text-xs flex items-start gap-2 text-left">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {resendMessage && (
+              <div className="p-3 bg-emerald-950/40 border border-emerald-800/60 rounded-xl text-emerald-300 text-xs flex items-center gap-2 text-left">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>{resendMessage}</span>
+              </div>
+            )}
+
+            {activationSuccess ? (
+              <div className="p-4 bg-emerald-950/50 border border-emerald-500/40 rounded-2xl text-emerald-300 text-xs space-y-1">
+                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
+                <p className="font-bold text-sm">
+                  {lang === 'bn' ? 'অভিনন্দন! একাউন্ট অ্যাক্টিভ হয়েছে' : 'Account Verified!'}
+                </p>
+                <p className="text-[11px] text-emerald-400/80">
+                  {lang === 'bn' ? 'ড্যাশবোর্ডে রিডাইরেক্ট করা হচ্ছে...' : 'Redirecting to your dashboard...'}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3 pt-2">
+                {/* Immediate Activate Now Button */}
+                <button
+                  type="button"
+                  onClick={handleActivateAccount}
+                  disabled={activating}
+                  className="w-full py-3.5 px-4 bg-gradient-to-r from-[#d946ef] via-[#ec4899] to-[#f43f5e] hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-lg shadow-pink-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {activating ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <span>{lang === 'bn' ? '🚀 একাউন্ট অ্যাক্টিভ করুন (Activate Now)' : '🚀 Activate Account Now'}</span>
+                    </>
+                  )}
+                </button>
+
+                {verificationLink && (
+                  <div className="bg-[#0b1220] border border-[#1f2c42] rounded-xl p-2.5 text-left text-[11px] space-y-1">
+                    <p className="text-slate-400 font-semibold">
+                      {lang === 'bn' ? 'সরাসরি অ্যাক্টিভেশন লিঙ্ক:' : 'Direct Activation Link:'}
+                    </p>
+                    <a
+                      href={verificationLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sky-400 hover:underline break-all block text-[10px] font-mono"
+                    >
+                      {verificationLink}
+                    </a>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <button
+                    type="button"
+                    onClick={handleResendEmail}
+                    disabled={resending}
+                    className="text-slate-400 hover:text-white flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${resending ? 'animate-spin' : ''}`} />
+                    <span>{lang === 'bn' ? 'পুনরায় ইমেইল পাঠান' : 'Resend Email'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVerificationPending(false);
+                      setMode('login');
+                    }}
+                    className="text-pink-400 hover:underline cursor-pointer font-medium"
+                  >
+                    {lang === 'bn' ? 'লগইন করুন' : 'Back to Sign In'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* ================= MAIN REGISTER / LOGIN FORM ================= */
+          <div>
+            {/* Top Robot Icon with glow */}
+            <div className="w-14 h-14 rounded-2xl bg-[#1a253b]/80 border border-[#2b3c5e] text-sky-400 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-sky-500/10">
+              <Bot className="w-7 h-7" />
+            </div>
+
+            {/* Title & Subtitle */}
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-bold text-white tracking-tight">
+                {mode === 'register' ? 'Create Account' : 'Sign In'}
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                {mode === 'register'
+                  ? 'Join thousands of bot creators'
+                  : 'Welcome back to your bot cloud'}
               </p>
             </div>
-          </div>
 
-          {/* Privacy badge */}
-          <div className="mt-3 bg-white/10 border border-white/20 rounded-lg p-2.5 text-[11px] leading-relaxed text-white/95 flex items-start gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0 mt-0.5" />
-            <span>
-              {lang === 'bn'
-                ? 'সুরক্ষিত ডাটা আইসোলেশন: আপনি লগইন করলে শুধুমাত্র আপনার নিজের বট, কোড ও ফাইল দেখতে পাবেন। অন্য ইউজার আপনার ডকুমেন্ট বা বট কখনোই দেখতে পারবে না।'
-                : 'Complete Data Isolation: Only you can view or manage your hosted bots and files. Other users will never see your documents or bots.'}
-            </span>
-          </div>
-        </div>
+            {error && (
+              <div className="mb-4 p-3 bg-rose-950/40 border border-rose-800/60 rounded-xl text-rose-300 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                <span>{error}</span>
+              </div>
+            )}
 
-        {/* Tab switch */}
-        <div className="flex border-b border-[#e2e8f0] bg-[#f8fafc]">
-          <button
-            type="button"
-            onClick={() => {
-              setMode('login');
-              setError(null);
-            }}
-            className={`flex-1 py-3 text-xs font-semibold text-center flex items-center justify-center gap-1.5 transition-colors ${
-              mode === 'login'
-                ? 'text-[#0088cc] border-b-2 border-[#0088cc] bg-white'
-                : 'text-[#64748b] hover:text-[#1e293b]'
-            }`}
-          >
-            <LogIn className="w-3.5 h-3.5" />
-            <span>{lang === 'bn' ? 'লগইন (Login)' : 'Sign In'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode('register');
-              setError(null);
-            }}
-            className={`flex-1 py-3 text-xs font-semibold text-center flex items-center justify-center gap-1.5 transition-colors ${
-              mode === 'register'
-                ? 'text-[#0088cc] border-b-2 border-[#0088cc] bg-white'
-                : 'text-[#64748b] hover:text-[#1e293b]'
-            }`}
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>{lang === 'bn' ? 'রেজিস্ট্রেশন (Register)' : 'Create Account'}</span>
-          </button>
-        </div>
+            <form onSubmit={handleSubmit} className="space-y-3.5">
+              {/* Full Name field (Only in Register mode) */}
+              {mode === 'register' && (
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Full Name"
+                    className="w-full bg-[#0b1220] border border-[#1f2d48] focus:border-[#ec4899] rounded-xl text-white placeholder-slate-500 py-3 pl-10 pr-4 text-xs focus:outline-none transition-all"
+                  />
+                </div>
+              )}
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {mode === 'register' && (
-            <div>
-              <label className="block text-xs font-semibold text-[#1e293b] mb-1.5">
-                {lang === 'bn' ? 'আপনার পূর্ণ নাম' : 'Full Name'}
-              </label>
+              {/* Email Address field */}
               <div className="relative">
-                <User className="w-4 h-4 text-[#94a3b8] absolute left-3 top-3" />
+                <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
                 <input
-                  type="text"
+                  type="email"
                   required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={lang === 'bn' ? 'যেমন: রহিম আহমেদ' : 'e.g. John Doe'}
-                  className="w-full pl-9 pr-3 py-2.5 text-xs bg-[#f8fafc] border border-[#e2e8f0] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0088cc] text-[#1e293b]"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Email Address"
+                  className="w-full bg-[#0b1220] border border-[#1f2d48] focus:border-[#ec4899] rounded-xl text-white placeholder-slate-500 py-3 pl-10 pr-4 text-xs focus:outline-none transition-all"
                 />
               </div>
-            </div>
-          )}
 
-          <div>
-            <label className="block text-xs font-semibold text-[#1e293b] mb-1.5">
-              {lang === 'bn' ? 'ইমেইল অ্যাড্রেস' : 'Email Address'}
-            </label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-[#94a3b8] absolute left-3 top-3" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="user@example.com"
-                className="w-full pl-9 pr-3 py-2.5 text-xs bg-[#f8fafc] border border-[#e2e8f0] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0088cc] text-[#1e293b]"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[#1e293b] mb-1.5">
-              {lang === 'bn' ? 'পাসওয়ার্ড' : 'Password'}
-            </label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-[#94a3b8] absolute left-3 top-3" />
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-9 pr-3 py-2.5 text-xs bg-[#f8fafc] border border-[#e2e8f0] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0088cc] text-[#1e293b]"
-              />
-            </div>
-          </div>
-
-          {mode === 'register' && (
-            <div>
-              <label className="block text-xs font-semibold text-[#1e293b] mb-1.5">
-                {lang === 'bn' ? 'কনফার্ম পাসওয়ার্ড' : 'Confirm Password'}
-              </label>
+              {/* Password field */}
               <div className="relative">
-                <Lock className="w-4 h-4 text-[#94a3b8] absolute left-3 top-3" />
+                <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   minLength={6}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-9 pr-3 py-2.5 text-xs bg-[#f8fafc] border border-[#e2e8f0] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0088cc] text-[#1e293b]"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password (min 6 chars)"
+                  className="w-full bg-[#0b1220] border border-[#1f2d48] focus:border-[#ec4899] rounded-xl text-white placeholder-slate-500 py-3 pl-10 pr-10 text-xs focus:outline-none transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-slate-500 hover:text-slate-300"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
-            </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 px-4 bg-[#0088cc] hover:bg-[#0077b5] text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-          >
-            {loading ? (
-              <span className="inline-block animate-spin">⏳</span>
-            ) : mode === 'login' ? (
-              <>
-                <LogIn className="w-4 h-4" />
-                <span>{lang === 'bn' ? 'লগইন করুন' : 'Sign In Now'}</span>
-              </>
-            ) : (
-              <>
-                <UserPlus className="w-4 h-4" />
-                <span>{lang === 'bn' ? 'একাউন্ট তৈরি করুন' : 'Register Account'}</span>
-              </>
-            )}
-          </button>
+              {/* Terms Checkbox in Register Mode */}
+              {mode === 'register' && (
+                <label className="flex items-start gap-2 pt-1 cursor-pointer select-none text-[11px] text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={agreeTerms}
+                    onChange={(e) => setAgreeTerms(e.target.checked)}
+                    className="mt-0.5 rounded border-slate-700 bg-[#0b1220] text-pink-500 focus:ring-pink-500"
+                  />
+                  <span>
+                    By creating an account, you agree to our{' '}
+                    <span className="text-slate-300 hover:underline">Terms</span> and{' '}
+                    <span className="text-slate-300 hover:underline">Privacy Policy</span>
+                  </span>
+                </label>
+              )}
 
-          {/* Quick Demo Test Buttons */}
-          <div className="pt-2 border-t border-[#f1f5f9]">
-            <p className="text-[11px] text-[#64748b] text-center mb-2 font-medium">
-              {lang === 'bn' ? 'অথবা দ্রুত টেস্ট করার জন্য যেকোনো একটি বেছে নিন:' : 'Or choose a test profile to test multi-user isolation:'}
-            </p>
-            <div className="grid grid-cols-2 gap-2">
+              {/* Cloudflare Turnstile Box (matches screenshot) */}
+              <div className="bg-[#090e1a] border border-[#1e2a42] rounded-xl px-4 py-2.5 flex items-center justify-between mt-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-xs font-semibold text-slate-300">
+                    Success!
+                  </span>
+                </div>
+                <div className="text-right">
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-amber-500 uppercase tracking-wide">
+                    <span>☁️</span>
+                    <span>CLOUDFLARE</span>
+                  </div>
+                  <p className="text-[9px] text-slate-500">Privacy • Terms</p>
+                </div>
+              </div>
+
+              {/* Gradient Submit Button */}
               <button
-                type="button"
-                onClick={() => fillDemoAccount('User 1 (Admin)', 'user1@example.com')}
-                className="py-1.5 px-2 bg-[#f8fafc] hover:bg-[#f1f5f9] border border-[#e2e8f0] rounded-lg text-[11px] font-semibold text-[#1e293b] text-center transition-colors cursor-pointer"
+                type="submit"
+                disabled={loading || (mode === 'register' && !agreeTerms)}
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-[#d946ef] via-[#ec4899] to-[#f43f5e] hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-lg shadow-pink-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-4"
               >
-                👤 User 1 (Primary)
+                {loading ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : mode === 'register' ? (
+                  <>
+                    <span>Create Account</span>
+                    <span className="text-sm">👤+</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In</span>
+                    <span className="text-sm">🚀</span>
+                  </>
+                )}
               </button>
-              <button
-                type="button"
-                onClick={() => fillDemoAccount('User 2 (Isolated)', 'user2@example.com')}
-                className="py-1.5 px-2 bg-[#f8fafc] hover:bg-[#f1f5f9] border border-[#e2e8f0] rounded-lg text-[11px] font-semibold text-[#1e293b] text-center transition-colors cursor-pointer"
-              >
-                👤 User 2 (Secondary)
-              </button>
+            </form>
+
+            {/* Switch Mode Link */}
+            <div className="text-center mt-5">
+              {mode === 'register' ? (
+                <p className="text-xs text-slate-400">
+                  Already have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('login');
+                      setError(null);
+                    }}
+                    className="text-pink-400 hover:text-pink-300 font-semibold hover:underline cursor-pointer ml-1"
+                  >
+                    Sign In Here
+                  </button>
+                </p>
+              ) : (
+                <p className="text-xs text-slate-400">
+                  Don't have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('register');
+                      setError(null);
+                    }}
+                    className="text-pink-400 hover:text-pink-300 font-semibold hover:underline cursor-pointer ml-1"
+                  >
+                    Create Account Here
+                  </button>
+                </p>
+              )}
             </div>
-            <p className="text-[10px] text-slate-400 text-center mt-1.5">
-              {lang === 'bn'
-                ? 'টিপস: ইউজার ১ ও ইউজার ২ আলাদা আলাদা বট দেখতে পাবে।'
-                : 'Tip: Each user only sees their own bots.'}
-            </p>
+
+            {/* Need Help link */}
+            <div className="border-t border-[#1f2c42] mt-5 pt-4 text-center">
+              <a
+                href="https://t.me"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-slate-400 hover:text-slate-300 flex items-center justify-center gap-1 transition-colors"
+              >
+                <span>Need Help? Contact Support</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
           </div>
-        </form>
+        )}
       </div>
     </div>
   );

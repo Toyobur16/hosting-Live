@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, Terminal, FileCode, Globe, Users, Cloud, Radio, ShieldCheck, X, Shield, Lock, LogIn, UserCheck, AlertCircle } from 'lucide-react';
+import { Layers, Terminal, FileCode, Globe, Users, Cloud, Radio, ShieldCheck, X, Shield, Lock, LogIn, UserCheck, AlertCircle, Database, CheckCircle2 } from 'lucide-react';
 import { Header } from './components/Header';
 import { BotList } from './components/BotList';
 import { LiveConsole } from './components/LiveConsole';
@@ -7,6 +7,7 @@ import { ScriptEditor } from './components/ScriptEditor';
 import { ServicesManager } from './components/ServicesManager';
 import { UsersManager } from './components/UsersManager';
 import { HostingGuide } from './components/HostingGuide';
+import { DatabaseManager } from './components/DatabaseManager';
 import { BroadcastModal } from './components/BroadcastModal';
 import { NewBotModal } from './components/NewBotModal';
 import { PipManagerModal } from './components/PipManagerModal';
@@ -18,12 +19,13 @@ export default function App() {
   const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'bots' | 'terminal' | 'script' | 'services' | 'users' | 'guide'>('bots');
+  const [activeTab, setActiveTab] = useState<'bots' | 'terminal' | 'script' | 'services' | 'users' | 'guide' | 'database'>('bots');
   const [lang, setLang] = useState<'bn' | 'en'>('bn');
   const [showNewBotModal, setShowNewBotModal] = useState(false);
   const [showPipModal, setShowPipModal] = useState(false);
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [tokenModalData, setTokenModalData] = useState<any>(null);
+  const [activationToast, setActivationToast] = useState<string | null>(null);
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
@@ -54,15 +56,16 @@ export default function App() {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      if (data.authenticated && data.user) {
+      if ((data.authenticated || data.success) && data.user) {
         setCurrentUser(data.user);
+        setShowAuthModal(false);
       } else {
         localStorage.removeItem('bot_auth_token');
         setCurrentUser(null);
         setShowAuthModal(true);
       }
     } catch {
-      setShowAuthModal(true);
+      // If network fails temporarily, don't immediately wipe token
     } finally {
       setAuthChecked(true);
     }
@@ -104,6 +107,39 @@ export default function App() {
 
   useEffect(() => {
     checkAuth();
+
+    // Check URL parameters for email verification
+    const params = new URLSearchParams(window.location.search);
+    const verifyToken = params.get('verify_token');
+    const verifiedParam = params.get('verified');
+
+    if (verifyToken) {
+      fetch('/api/auth/verify-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: verifyToken })
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.user) {
+            setCurrentUser((prev) => (prev ? { ...prev, isVerified: true } : data.user));
+            setActivationToast(
+              lang === 'bn'
+                ? '🎉 অভিনন্দন! আপনার অ্যাকাউন্ট সফলভাবে ভেরিফাই ও অ্যাক্টিভ করা হয়েছে!'
+                : '🎉 Congratulations! Your account has been verified & activated!'
+            );
+          }
+          window.history.replaceState({}, document.title, window.location.pathname);
+        })
+        .catch(() => {});
+    } else if (verifiedParam) {
+      setActivationToast(
+        lang === 'bn'
+          ? '🎉 অভিনন্দন! আপনার অ্যাকাউন্ট সফলভাবে অ্যাক্টিভ করা হয়েছে!'
+          : '🎉 Congratulations! Your account has been activated!'
+      );
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, []);
 
   useEffect(() => {
@@ -258,34 +294,79 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Activation Toast */}
+        {activationToast && (
+          <div className="bg-emerald-600 text-white px-5 py-3.5 rounded-2xl flex items-center justify-between shadow-lg shadow-emerald-600/20 text-xs font-semibold animate-in fade-in duration-200">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-5 h-5 text-emerald-200 shrink-0" />
+              <span>{activationToast}</span>
+            </div>
+            <button
+              onClick={() => setActivationToast(null)}
+              className="text-white/80 hover:text-white font-bold px-2 py-1 hover:bg-emerald-700 rounded-lg transition-colors cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* User Isolation & Security Banner */}
         {currentUser ? (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                <Lock className="w-5 h-5" />
+          <div className="space-y-3">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-xs font-bold text-emerald-900 flex items-center gap-2">
+                    <span>{lang === 'bn' ? 'সুরক্ষিত প্রাইভেট ওয়ার্কস্পেস:' : 'Isolated Private Workspace:'}</span>
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-200/60 text-emerald-800 font-semibold">
+                      {currentUser.name} ({currentUser.email})
+                    </span>
+                  </h2>
+                  <p className="text-[11px] text-emerald-700 mt-0.5">
+                    {lang === 'bn'
+                      ? 'আপনার তৈরি করা সমস্ত বট, কোড ও ফাইল সম্পূর্ণ আলাদা ও প্রাইভেট। অন্য কোনো ইউজার আপনার ডকুমেন্ট বা বট দেখতে পারবে না।'
+                      : 'All your hosted bots, code, and files are completely isolated. No other registered user can see or access your documents.'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xs font-bold text-emerald-900 flex items-center gap-2">
-                  <span>{lang === 'bn' ? 'সুরক্ষিত প্রাইভেট ওয়ার্কস্পেস:' : 'Isolated Private Workspace:'}</span>
-                  <span className="px-2 py-0.5 rounded-md bg-emerald-200/60 text-emerald-800 font-semibold">
-                    {currentUser.name} ({currentUser.email})
-                  </span>
-                </h2>
-                <p className="text-[11px] text-emerald-700 mt-0.5">
-                  {lang === 'bn'
-                    ? 'আপনার তৈরি করা সমস্ত বট, কোড ও ফাইল সম্পূর্ণ আলাদা ও প্রাইভেট। অন্য কোনো ইউজার আপনার ডকুমেন্ট বা বট দেখতে পারবে না।'
-                    : 'All your hosted bots, code, and files are completely isolated. No other registered user can see or access your documents.'}
-                </p>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-emerald-800 bg-white/80 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{lang === 'bn' ? 'ব্যক্তিগত একাউন্ট সক্রিয়' : 'Private Profile Active'}</span>
+                </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-emerald-800 bg-white/80 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1.5">
-                <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{lang === 'bn' ? 'ব্যক্তিগত একাউন্ট সক্রিয়' : 'Private Profile Active'}</span>
-              </span>
-            </div>
+            {/* Unverified Account Notice if applicable */}
+            {currentUser.isVerified === false && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-amber-900">
+                      {lang === 'bn' ? 'অ্যাকাউন্ট ভেরিফিকেশন অপেক্ষারত' : 'Account Email Verification Pending'}
+                    </h3>
+                    <p className="text-[11px] text-amber-700 mt-0.5">
+                      {lang === 'bn'
+                        ? 'আপনার ইমেইলে পাঠানো অ্যাক্টিভেশন লিঙ্কে ক্লিক করে অথবা নিচের বাটনে চাপ দিয়ে অ্যাকাউন্ট সক্রিয় করুন।'
+                        : 'Please verify your email via the activation link or click the button to verify.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>{lang === 'bn' ? '🚀 অ্যাকাউন্ট অ্যাক্টিভ করুন' : '🚀 Verify / Activate Now'}</span>
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
@@ -358,6 +439,18 @@ export default function App() {
             >
               <FileCode className="w-3.5 h-3.5" />
               <span>{lang === 'bn' ? 'কোড ও ফাইল ম্যানেজার' : 'Code & Files'}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('database')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === 'database'
+                  ? 'bg-[#0088cc] text-white shadow-xs'
+                  : 'text-[#64748b] hover:text-[#0088cc] hover:bg-[#f8fafc]'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>{lang === 'bn' ? 'ডাটাবেজ ও স্টোরেজ' : 'Database & Storage'}</span>
             </button>
 
             <button
@@ -456,6 +549,10 @@ export default function App() {
               if (selectedBotId) fetchLogs(selectedBotId);
             }}
           />
+        )}
+
+        {activeTab === 'database' && (
+          <DatabaseManager lang={lang} />
         )}
 
         {activeTab === 'services' && (

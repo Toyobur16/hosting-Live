@@ -2,8 +2,9 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-import { spawn, ChildProcess, execSync } from "child_process";
+import { spawn, spawnSync, ChildProcess, execSync } from "child_process";
 import { createServer as createViteServer } from "vite";
+import nodemailer from "nodemailer";
 
 interface LogItem {
   id: string;
@@ -38,6 +39,9 @@ export interface Account {
   passwordHash: string;
   salt: string;
   createdAt: string;
+  isVerified: boolean;
+  verificationToken?: string;
+  verificationSentAt?: string;
 }
 
 const app = express();
@@ -72,8 +76,14 @@ const sessions = new Map<string, { userId: string; expiresAt: number }>();
 
 function loadAccounts() {
   try {
+    if (!fs.existsSync(HOSTED_BOTS_DIR)) {
+      fs.mkdirSync(HOSTED_BOTS_DIR, { recursive: true });
+    }
     if (fs.existsSync(ACCOUNTS_FILE)) {
       accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, "utf-8"));
+    } else {
+      accounts = [];
+      fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify([], null, 2), "utf-8");
     }
   } catch (e: any) {
     console.error("Error loading accounts:", e.message);
@@ -93,11 +103,16 @@ function saveAccounts() {
 
 function loadSessions() {
   try {
+    if (!fs.existsSync(HOSTED_BOTS_DIR)) {
+      fs.mkdirSync(HOSTED_BOTS_DIR, { recursive: true });
+    }
     if (fs.existsSync(SESSIONS_FILE)) {
       const data = JSON.parse(fs.readFileSync(SESSIONS_FILE, "utf-8"));
       for (const [token, sess] of Object.entries(data)) {
         sessions.set(token, sess as any);
       }
+    } else {
+      fs.writeFileSync(SESSIONS_FILE, JSON.stringify({}, null, 2), "utf-8");
     }
   } catch {}
 }
@@ -115,6 +130,101 @@ function saveSessions() {
     }
     fs.writeFileSync(SESSIONS_FILE, JSON.stringify(obj, null, 2), "utf-8");
   } catch {}
+}
+
+// Mailer function for Account Email Verification
+async function sendActivationEmail(email: string, name: string, token: string, baseUrl: string) {
+  const activationLink = `${baseUrl}/?verify_token=${token}`;
+  const apiLink = `${baseUrl}/api/auth/verify-email?token=${token}`;
+
+  const htmlContent = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <title>Activate Your Account - Cloud Bot Host</title>
+  </head>
+  <body style="margin: 0; padding: 0; background-color: #0b0f19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f1f5f9;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0b0f19; padding: 40px 20px;">
+      <tr>
+        <td align="center">
+          <table width="100%" max-width="520px" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #131b2e; border: 1px solid #23314d; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+            <tr>
+              <td style="padding: 36px 32px; text-align: center; background: linear-gradient(180deg, #18233c 0%, #131b2e 100%);">
+                <div style="width: 64px; height: 64px; margin: 0 auto 16px; background-color: #1e293b; border: 1px solid #334155; border-radius: 16px; line-height: 64px; font-size: 32px;">
+                  🤖
+                </div>
+                <h1 style="margin: 0 0 8px; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">Cloud Bot Host</h1>
+                <p style="margin: 0; color: #94a3b8; font-size: 14px;">Next-Gen 24/7 Telegram Bot Cloud</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 32px; font-size: 15px; line-height: 1.6; color: #cbd5e1;">
+                <p style="margin: 0 0 16px; font-size: 16px; color: #ffffff; font-weight: 600;">স্বাগতম, ${name}!</p>
+                <p style="margin: 0 0 24px;">Cloud Bot Host প্ল্যাটফর্মে রেজিস্ট্রেশন করার জন্য ধন্যবাদ। আপনার একাউন্টটি সক্রিয় করতে এবং ২৪/৭ টেলিগ্রাম বট হোস্ট করতে নিচের বাটনে ক্লিক করুন:</p>
+                
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="center" style="padding: 10px 0 24px;">
+                      <a href="${activationLink}" target="_blank" style="display: inline-block; background: linear-gradient(90deg, #d946ef 0%, #ec4899 50%, #f43f5e 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 14px 32px; border-radius: 12px; box-shadow: 0 8px 20px rgba(236,72,153,0.35);">
+                        Activate Now / একাউন্ট একটিভ করুন 🚀
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin: 0 0 8px; font-size: 13px; color: #64748b;">বাটনে সমস্যা হলে নিচের লিংকে ক্লিক করুন:</p>
+                <p style="margin: 0 0 24px; font-size: 12px; word-break: break-all; background-color: #0c1220; padding: 12px; border-radius: 8px; border: 1px solid #1e293b; color: #38bdf8;">
+                  ${activationLink}
+                </p>
+
+                <p style="margin: 0; font-size: 13px; color: #64748b;">এই লিংকটি ২৪ ঘণ্টার জন্য কার্যকর থাকবে। আপনি এই একাউন্ট তৈরি না করে থাকলে এই ইমেইলটি উপেক্ষা করতে পারেন।</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 20px 32px; background-color: #0c1220; text-align: center; border-top: 1px solid #1e293b; font-size: 12px; color: #64748b;">
+                Cloud Bot Host Platform • 24/7 Never-Sleep Telegram Bot Hosting
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+  </html>
+  `;
+
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+
+  if (smtpHost && smtpUser && smtpPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: parseInt(process.env.SMTP_PORT || "587", 10),
+        secure: process.env.SMTP_SECURE === "true" || process.env.SMTP_PORT === "465",
+        auth: {
+          user: smtpUser,
+          pass: smtpPass
+        }
+      });
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || `"Cloud Bot Host" <${smtpUser}>`,
+        to: email,
+        subject: "Activate Your Account - Cloud Bot Host | একাউন্ট একটিভ করুন",
+        html: htmlContent
+      });
+      console.log(`[Email Verification] Sent real activation email to ${email}`);
+      return { sent: true, link: activationLink };
+    } catch (err: any) {
+      console.error(`[Email Verification] SMTP Error for ${email}:`, err.message);
+      return { sent: false, error: err.message, link: activationLink };
+    }
+  } else {
+    console.log(`[Email Verification] SMTP not set. Instant verification link generated for ${email}: ${activationLink}`);
+    return { sent: false, link: activationLink, note: "SMTP not configured" };
+  }
 }
 
 export function getAuthUser(req: express.Request): Account | null {
@@ -200,52 +310,8 @@ function initHostedBots() {
         autoRestart: b.autoRestart !== false
       }));
     } else {
-      // Seed default bot if bot.py exists in root
-      const rootBotPy = path.join(process.cwd(), "bot.py");
-      if (fs.existsSync(rootBotPy)) {
-        const defaultBotId = "sms-panel-bot";
-        const defaultBotDir = path.join(HOSTED_BOTS_DIR, defaultBotId);
-        if (!fs.existsSync(defaultBotDir)) {
-          fs.mkdirSync(defaultBotDir, { recursive: true });
-        }
-
-        const filesToCopy = [
-          "bot.py",
-          "requirements.txt",
-          "custom_services.json",
-          "users.json",
-          "withdraw_requests.json"
-        ];
-        for (const file of filesToCopy) {
-          const src = path.join(process.cwd(), file);
-          const dst = path.join(defaultBotDir, file);
-          if (fs.existsSync(src) && !fs.existsSync(dst)) {
-            try {
-              fs.copyFileSync(src, dst);
-            } catch {}
-          }
-        }
-
-        hostedBots = [
-          {
-            id: defaultBotId,
-            name: "Mino SMS Panel Bot",
-            entryFile: "bot.py",
-            token: "8814477083:AAH_G8v9gg3YRyVUyYvVRZ65Y_ZIT2nffJM",
-            status: 'stopped',
-            pid: null,
-            uptimeSeconds: 0,
-            startTime: null,
-            createdAt: new Date().toISOString(),
-            autoRestart: true,
-            env: {
-              BASE_URL: "https://minosms.com",
-              API_KEY: "mino_live_bfde1ae6289d122dfae7e3f6ff10a9c8"
-            }
-          }
-        ];
-        saveRegistry();
-      }
+      hostedBots = [];
+      saveRegistry();
     }
 
     // Auto-start bots configured to auto-restart (24/7 background run)
@@ -821,8 +887,8 @@ function authorizeBotAccess(req: express.Request, botId: string): { user: Accoun
 
 // ==================== AUTHENTICATION ROUTES ====================
 
-// 1. Register new user
-app.post("/api/auth/register", (req, res) => {
+// 1. Register new user with Email Verification
+app.post("/api/auth/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
     if (!name || !email || !password) {
@@ -841,34 +907,32 @@ app.post("/api/auth/register", (req, res) => {
 
     const salt = crypto.randomBytes(16).toString("hex");
     const passwordHash = crypto.pbkdf2Sync(String(password), salt, 1000, 64, "sha512").toString("hex");
+    const verificationToken = crypto.randomBytes(24).toString("hex");
+
     const newAccount: Account = {
       id: `usr_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`,
       name: String(name).trim(),
       email: cleanEmail,
       salt,
       passwordHash,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      isVerified: false,
+      verificationToken,
+      verificationSentAt: new Date().toISOString()
     };
 
     accounts.push(newAccount);
     saveAccounts();
 
-    // If this is the first registered user and there's a default bot without owner, claim it
-    if (accounts.length === 1) {
-      for (const b of hostedBots) {
-        if (!b.ownerId) {
-          b.ownerId = newAccount.id;
-          b.ownerName = newAccount.name;
-        }
-      }
-      saveRegistry();
-    }
-
-    // Create 30-day session
+    // Create 90-day persistent session so user stays logged in across reloads
     const token = crypto.randomBytes(32).toString("hex");
-    const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+    const expiresAt = Date.now() + 90 * 24 * 60 * 60 * 1000;
     sessions.set(token, { userId: newAccount.id, expiresAt });
     saveSessions();
+
+    // Trigger Activation Email
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const emailResult = await sendActivationEmail(newAccount.email, newAccount.name, verificationToken, baseUrl);
 
     res.json({
       success: true,
@@ -877,8 +941,16 @@ app.post("/api/auth/register", (req, res) => {
         id: newAccount.id,
         name: newAccount.name,
         email: newAccount.email,
+        isVerified: false,
+        verificationToken,
         createdAt: newAccount.createdAt
-      }
+      },
+      verificationToken,
+      verificationLink: emailResult.link,
+      emailSent: emailResult.sent,
+      message: emailResult.sent
+        ? "রেজিস্ট্রেশন সফল হয়েছে! আপনার ইমেইলে একটি অ্যাক্টিভেশন লিঙ্ক পাঠানো হয়েছে।"
+        : "রেজিস্ট্রেশন সফল হয়েছে! অ্যাকাউন্ট অ্যাক্টিভ করতে ভেরিফিকেশন লিংকে ক্লিক করুন।"
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -903,8 +975,9 @@ app.post("/api/auth/login", (req, res) => {
       return res.status(401).json({ error: "ভুল ইমেইল বা পাসওয়ার্ড" });
     }
 
+    // 90-day permanent session token
     const token = crypto.randomBytes(32).toString("hex");
-    const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+    const expiresAt = Date.now() + 90 * 24 * 60 * 60 * 1000;
     sessions.set(token, { userId: account.id, expiresAt });
     saveSessions();
 
@@ -915,6 +988,8 @@ app.post("/api/auth/login", (req, res) => {
         id: account.id,
         name: account.name,
         email: account.email,
+        isVerified: account.isVerified !== false,
+        verificationToken: account.verificationToken,
         createdAt: account.createdAt
       }
     });
@@ -927,19 +1002,104 @@ app.post("/api/auth/login", (req, res) => {
 app.get("/api/auth/me", (req, res) => {
   const user = getAuthUser(req);
   if (!user) {
-    return res.status(401).json({ error: "Not logged in" });
+    return res.status(401).json({ authenticated: false, error: "Not logged in" });
   }
   res.json({
+    authenticated: true,
+    success: true,
     user: {
       id: user.id,
       name: user.name,
       email: user.email,
+      isVerified: user.isVerified !== false,
+      verificationToken: user.verificationToken,
       createdAt: user.createdAt
     }
   });
 });
 
-// 4. Logout
+// 4. Verify Account via Link Click (from email)
+app.get("/api/auth/verify-email", (req, res) => {
+  const token = String(req.query.token || "");
+  if (!token) {
+    return res.status(400).send("Invalid verification link.");
+  }
+  const account = accounts.find(a => a.verificationToken === token);
+  if (!account) {
+    return res.status(404).send("ভেরিফিকেশন লিঙ্কটি সঠিক নয় বা ইতিমধ্যে ব্যবহৃত হয়েছে।");
+  }
+  account.isVerified = true;
+  delete account.verificationToken;
+  saveAccounts();
+  // Redirect to home dashboard with verified flag
+  res.redirect("/?verified=1");
+});
+
+// 5. Verify Account via In-App Token verification
+app.post("/api/auth/verify-token", (req, res) => {
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: "টোকেন আবশ্যক" });
+  }
+  const account = accounts.find(a => a.verificationToken === token);
+  if (!account) {
+    return res.status(404).json({ error: "ভেরিফিকেশন লিঙ্ক বা কোডটি সঠিক নয় বা মেয়াদোত্তীর্ণ হয়েছে।" });
+  }
+  account.isVerified = true;
+  delete account.verificationToken;
+  saveAccounts();
+
+  res.json({
+    success: true,
+    message: "আপনার অ্যাকাউন্ট সফলভাবে সক্রিয় করা হয়েছে! (Account successfully activated)",
+    user: {
+      id: account.id,
+      name: account.name,
+      email: account.email,
+      isVerified: true,
+      createdAt: account.createdAt
+    }
+  });
+});
+
+// 6. Resend Verification Email
+app.post("/api/auth/resend-verification", async (req, res) => {
+  try {
+    const user = getAuthUser(req);
+    const email = req.body.email || (user ? user.email : "");
+    if (!email) {
+      return res.status(400).json({ error: "ইমেইল প্রদান করুন" });
+    }
+    const cleanEmail = String(email).trim().toLowerCase();
+    const account = accounts.find(a => a.email.toLowerCase() === cleanEmail);
+    if (!account) {
+      return res.status(404).json({ error: "অ্যাকাউন্ট পাওয়া যায়নি" });
+    }
+    if (account.isVerified) {
+      return res.json({ success: true, message: "অ্যাকাউন্ট ইতিমধ্যে ভেরিফাইড!" });
+    }
+
+    const verificationToken = crypto.randomBytes(24).toString("hex");
+    account.verificationToken = verificationToken;
+    account.verificationSentAt = new Date().toISOString();
+    saveAccounts();
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const emailResult = await sendActivationEmail(account.email, account.name, verificationToken, baseUrl);
+
+    res.json({
+      success: true,
+      message: "নতুন অ্যাক্টিভেশন ইমেইল পাঠানো হয়েছে!",
+      verificationToken,
+      verificationLink: emailResult.link,
+      sent: emailResult.sent
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7. Logout
 app.post("/api/auth/logout", (req, res) => {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -948,6 +1108,106 @@ app.post("/api/auth/logout", (req, res) => {
     saveSessions();
   }
   res.json({ success: true });
+});
+
+// ==================== CODE & SYNTAX CHECKER ====================
+app.post("/api/code/syntax-check", (req, res) => {
+  const { code } = req.body;
+  if (typeof code !== "string") {
+    return res.status(400).json({ error: "Code must be a string" });
+  }
+  const tmpFile = path.join("/tmp", `syntax_check_${Date.now()}_${Math.random().toString(36).substring(7)}.py`);
+  try {
+    fs.writeFileSync(tmpFile, code, "utf-8");
+    const result = spawnSync("python3", ["-m", "py_compile", tmpFile], { encoding: "utf-8" });
+    if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+    if (result.status === 0) {
+      return res.json({ valid: true, message: "Python Syntax OK! কোনো সিনট্যাক্স এরর পাওয়া যায়নি।" });
+    } else {
+      const stderr = result.stderr || result.stdout || "Syntax Error";
+      const lineMatch = stderr.match(/line (\d+)/i);
+      const line = lineMatch ? parseInt(lineMatch[1], 10) : null;
+      return res.json({
+        valid: false,
+        error: stderr.replace(new RegExp(tmpFile, "g"), "script.py"),
+        line
+      });
+    }
+  } catch (e: any) {
+    if (fs.existsSync(tmpFile)) try { fs.unlinkSync(tmpFile); } catch {}
+    return res.status(500).json({ valid: false, error: e.message });
+  }
+});
+
+// ==================== DATABASE OVERVIEW & EXPORT ====================
+app.get("/api/database/overview", (req, res) => {
+  const user = getAuthUser(req);
+  res.json({
+    storageLocation: {
+      accountsDb: path.join(HOSTED_BOTS_DIR, "accounts.json"),
+      registryDb: path.join(HOSTED_BOTS_DIR, "registry.json"),
+      sessionsDb: path.join(HOSTED_BOTS_DIR, "sessions.json"),
+      botsStorage: HOSTED_BOTS_DIR
+    },
+    stats: {
+      totalUsers: accounts.length,
+      verifiedUsers: accounts.filter(a => a.isVerified).length,
+      totalBots: hostedBots.length,
+      runningBots: Array.from(activeProcesses.keys()).length,
+      activeSessions: sessions.size
+    },
+    accounts: accounts.map(a => ({
+      id: a.id,
+      name: a.name,
+      email: a.email,
+      isVerified: a.isVerified !== false,
+      createdAt: a.createdAt,
+      botsCount: hostedBots.filter(b => b.ownerId === a.id).length
+    })),
+    bots: hostedBots.map(b => ({
+      id: b.id,
+      name: b.name,
+      ownerId: b.ownerId,
+      ownerName: b.ownerName,
+      status: activeProcesses.has(b.id) ? "running" : "stopped",
+      autoRestart: b.autoRestart,
+      createdAt: b.createdAt
+    }))
+  });
+});
+
+app.get("/api/database/export", (req, res) => {
+  const table = (req.query.table as string) || "all";
+  if (table === "accounts") {
+    res.setHeader("Content-Disposition", 'attachment; filename="accounts.json"');
+    res.setHeader("Content-Type", "application/json");
+    return res.json(accounts.map(a => ({
+      id: a.id,
+      name: a.name,
+      email: a.email,
+      isVerified: a.isVerified !== false,
+      createdAt: a.createdAt
+    })));
+  } else if (table === "bots") {
+    res.setHeader("Content-Disposition", 'attachment; filename="bots_registry.json"');
+    res.setHeader("Content-Type", "application/json");
+    return res.json(hostedBots);
+  } else {
+    res.setHeader("Content-Disposition", 'attachment; filename="bothost_database_backup.json"');
+    res.setHeader("Content-Type", "application/json");
+    return res.json({
+      exportedAt: new Date().toISOString(),
+      accounts: accounts.map(a => ({
+        id: a.id,
+        name: a.name,
+        email: a.email,
+        isVerified: a.isVerified !== false,
+        createdAt: a.createdAt
+      })),
+      bots: hostedBots,
+      sessionsCount: sessions.size
+    });
+  }
 });
 
 // ==================== BOT ROUTES (USER ISOLATED) ====================

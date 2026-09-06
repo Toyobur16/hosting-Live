@@ -1,5 +1,5 @@
 import React from 'react';
-import { Terminal, ShieldCheck, Globe, Plus, Package, LogOut, User, Lock, UserCheck } from 'lucide-react';
+import { Terminal, ShieldCheck, Globe, Plus, Package, LogOut, User, Lock, UserCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { HostedBot, AuthUser } from '../types';
 
 interface HeaderProps {
@@ -144,10 +144,20 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
                 <div className="text-left hidden lg:block leading-tight">
                   <p className="font-bold text-[#1e293b] text-xs truncate max-w-[120px]">{user.name}</p>
-                  <p className="text-[10px] text-emerald-600 flex items-center gap-1">
-                    <UserCheck className="w-2.5 h-2.5" />
-                    <span>আইসোলেটেড একাউন্ট</span>
-                  </p>
+                  {user.isVerified !== false ? (
+                    <p className="text-[10px] text-emerald-600 flex items-center gap-1 font-semibold">
+                      <CheckCircle2 className="w-2.5 h-2.5" />
+                      <span>{lang === 'bn' ? 'ভেরিফাইড একাউন্ট' : 'Verified Profile'}</span>
+                    </p>
+                  ) : (
+                    <button
+                      onClick={onOpenAuthModal}
+                      className="text-[10px] text-amber-600 hover:text-amber-700 flex items-center gap-1 font-bold cursor-pointer"
+                    >
+                      <AlertCircle className="w-2.5 h-2.5" />
+                      <span>{lang === 'bn' ? '⚠️ ভেরিফাই করুন' : '⚠️ Verify Now'}</span>
+                    </button>
+                  )}
                 </div>
               </div>
               <button

@@ -40,6 +40,44 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({ lang, botId, botName
   const [baseUrl, setBaseUrl] = useState('');
   const [showConfigHelper, setShowConfigHelper] = useState(true);
 
+  // Syntax check state
+  const [syntaxStatus, setSyntaxStatus] = useState<{
+    checking: boolean;
+    valid?: boolean;
+    message?: string;
+    error?: string;
+    line?: number | null;
+  } | null>(null);
+
+  const checkPythonSyntax = async () => {
+    if (!content) return;
+    setSyntaxStatus({ checking: true });
+    try {
+      const res = await fetch('/api/code/syntax-check', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
+        body: JSON.stringify({ code: content })
+      });
+      const data = await res.json();
+      setSyntaxStatus({
+        checking: false,
+        valid: data.valid,
+        message: data.message,
+        error: data.error,
+        line: data.line
+      });
+    } catch (e: any) {
+      setSyntaxStatus({
+        checking: false,
+        valid: false,
+        error: e.message || 'Failed to check syntax'
+      });
+    }
+  };
+
   const getAuthHeaders = () => {
     const token = localStorage.getItem('bot_auth_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -436,7 +474,24 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({ lang, botId, botName
           </div>
 
           {/* Actions on Top Right */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {selectedFile.endsWith('.py') && (
+              <button
+                type="button"
+                onClick={checkPythonSyntax}
+                disabled={syntaxStatus?.checking || loading}
+                className="px-3 py-1.5 bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#1e293b] border border-[#cbd5e1] text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+                title={lang === 'bn' ? 'কোডে কোনো সিনট্যাক্স এরর আছে কিনা চেক করুন' : 'Check Python code for syntax errors'}
+              >
+                {syntaxStatus?.checking ? (
+                  <RotateCw className="w-3.5 h-3.5 animate-spin text-[#0088cc]" />
+                ) : (
+                  <span className="text-sm">🔍</span>
+                )}
+                <span>{lang === 'bn' ? 'কোড এরর চেক' : 'Check Syntax'}</span>
+              </button>
+            )}
+
             <label className="flex items-center gap-1.5 text-xs text-[#64748b] cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -444,7 +499,7 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({ lang, botId, botName
                 onChange={(e) => setAutoRestart(e.target.checked)}
                 className="rounded text-[#0088cc] border-[#cbd5e1] focus:ring-[#0088cc]"
               />
-              <span>{lang === 'bn' ? 'সেভ করার পর অটো-রিস্টার্ট' : 'Auto-restart on save'}</span>
+              <span>{lang === 'bn' ? 'অটো-রিস্টার্ট' : 'Auto-restart'}</span>
             </label>
 
             <button
@@ -457,10 +512,51 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({ lang, botId, botName
               ) : (
                 <Save className="w-3.5 h-3.5" />
               )}
-              <span>{lang === 'bn' ? 'সেভ করুন' : 'Save Changes'}</span>
+              <span>{lang === 'bn' ? 'সেভ করুন' : 'Save'}</span>
             </button>
           </div>
         </div>
+
+        {/* Syntax Check Result Banner */}
+        {syntaxStatus && !syntaxStatus.checking && (
+          <div
+            className={`px-5 py-3 border-b text-xs flex items-start justify-between gap-3 ${
+              syntaxStatus.valid
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}
+          >
+            <div className="flex items-start gap-2.5">
+              {syntaxStatus.valid ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              )}
+              <div>
+                <p className="font-bold">
+                  {syntaxStatus.valid
+                    ? lang === 'bn'
+                      ? '✓ পাইথন কোড সম্পূর্ণ সঠিক! কোনো সিনট্যাক্স এরর পাওয়া যায়নি।'
+                      : '✓ Python Syntax OK! No syntax errors detected.'
+                    : lang === 'bn'
+                    ? `⚠️ কোডে সিনট্যাক্স সমস্যা পাওয়া গেছে${syntaxStatus.line ? ` (লাইন ${syntaxStatus.line})` : ''}:`
+                    : `⚠️ Syntax Error Detected${syntaxStatus.line ? ` (Line ${syntaxStatus.line})` : ''}:`}
+                </p>
+                {syntaxStatus.error && (
+                  <pre className="mt-1 font-mono text-[11px] bg-rose-100/70 p-2 rounded-lg text-rose-950 overflow-x-auto whitespace-pre-wrap">
+                    {syntaxStatus.error}
+                  </pre>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => setSyntaxStatus(null)}
+              className="text-slate-400 hover:text-slate-600 p-1 text-xs font-bold"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* New file input popup */}
         {showNewFileInput && (
