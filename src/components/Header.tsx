@@ -1,5 +1,5 @@
 import React from 'react';
-import { Terminal, ShieldCheck, Globe, Plus, Package, LogOut, User, Lock, UserCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Terminal, Settings, Globe, Plus, LogOut, User, CheckCircle2 } from 'lucide-react';
 import { HostedBot, AuthUser } from '../types';
 
 interface HeaderProps {
@@ -7,8 +7,7 @@ interface HeaderProps {
   selectedBotId: string | null;
   onSelectBot: (botId: string) => void;
   onOpenNewBotModal: () => void;
-  onOpenPipModal: () => void;
-  onTestToken: () => void;
+  onOpenSettingsModal: (initialTab?: string) => void;
   lang: 'bn' | 'en';
   setLang: (lang: 'bn' | 'en') => void;
   user: AuthUser | null;
@@ -21,8 +20,7 @@ export const Header: React.FC<HeaderProps> = ({
   selectedBotId,
   onSelectBot,
   onOpenNewBotModal,
-  onOpenPipModal,
-  onTestToken,
+  onOpenSettingsModal,
   lang,
   setLang,
   user,
@@ -33,18 +31,18 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="bg-white border-b border-[#e2e8f0] text-[#1e293b] sticky top-0 z-30 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3">
         {/* Branding */}
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#0088cc] flex items-center justify-center text-white font-bold text-lg shadow-sm">
+          <div className="w-10 h-10 rounded-2xl bg-[#0088cc] flex items-center justify-center text-white font-bold text-lg shadow-sm shadow-[#0088cc]/20">
             <Terminal className="w-5 h-5 text-white" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base sm:text-lg font-bold tracking-tight text-[#1e293b] flex items-center gap-1.5">
-                BotHost Live
+                Bot-Host
                 <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#0088cc]/10 text-[#0088cc] border border-[#0088cc]/20 font-semibold">
-                  Cloud Platform
+                  Cloud
                 </span>
                 <span className="hidden sm:inline-flex text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
                   ২৪/৭ লাইভ
@@ -53,13 +51,13 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <p className="text-xs text-[#64748b]">
               {lang === 'bn'
-                ? 'সুরক্ষিত পারসোনাল টেলিগ্রাম বট হোস্টিং (অন্য ইউজার আপনার বট দেখতে পারবে না)'
-                : 'Isolated & Secure Telegram Bot Cloud Hosting (Private per user)'}
+                ? 'সুরক্ষিত টেলিগ্রাম বট ক্লাউড হোস্টিং প্ল্যাটফর্ম'
+                : 'Isolated & Secure Telegram Bot Cloud Hosting'}
             </p>
           </div>
         </div>
 
-        {/* Bot selector & Live status */}
+        {/* Live status badge */}
         <div className="flex items-center gap-2 bg-[#f8fafc] px-3 py-1.5 rounded-xl border border-[#e2e8f0]">
           <span className="relative flex h-2 w-2">
             {runningCount > 0 && (
@@ -101,29 +99,18 @@ export const Header: React.FC<HeaderProps> = ({
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-[#0088cc] hover:bg-[#0077b5] text-white transition-all shadow-sm shadow-[#0088cc]/20 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>{lang === 'bn' ? '+ নতুন বট হোস্ট' : '+ Deploy Bot'}</span>
+            <span>{lang === 'bn' ? '+ নতুন বট' : '+ Deploy Bot'}</span>
           </button>
 
-          {/* Pip manager button */}
+          {/* Settings & Tools Button */}
           <button
-            id="header-pip-btn"
-            onClick={onOpenPipModal}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#1e293b] border border-[#e2e8f0] transition-all cursor-pointer"
-            title="Manage Python Packages"
+            id="header-settings-btn"
+            onClick={() => onOpenSettingsModal('overview')}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#1e293b] border border-[#e2e8f0] hover:border-[#0088cc]/40 transition-all cursor-pointer shadow-2xs"
+            title={lang === 'bn' ? 'প্ল্যাটফর্ম সেটিংস ও টুলস' : 'Platform Settings & Tools'}
           >
-            <Package className="w-3.5 h-3.5 text-[#0088cc]" />
-            <span className="hidden sm:inline">pip</span>
-          </button>
-
-          {/* Test Token button */}
-          <button
-            id="header-test-token-btn"
-            onClick={onTestToken}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#64748b] hover:text-[#1e293b] border border-[#e2e8f0] transition-all cursor-pointer"
-            title="Verify Bot Token with Telegram API"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-[#0088cc]" />
-            <span className="hidden md:inline">{lang === 'bn' ? 'টোকেন টেস্ট' : 'Test Token'}</span>
+            <Settings className="w-3.5 h-3.5 text-[#0088cc]" />
+            <span>{lang === 'bn' ? 'সেটিংস' : 'Settings'}</span>
           </button>
 
           {/* Language Switch */}
@@ -144,20 +131,10 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
                 <div className="text-left hidden lg:block leading-tight">
                   <p className="font-bold text-[#1e293b] text-xs truncate max-w-[120px]">{user.name}</p>
-                  {user.isVerified !== false ? (
-                    <p className="text-[10px] text-emerald-600 flex items-center gap-1 font-semibold">
-                      <CheckCircle2 className="w-2.5 h-2.5" />
-                      <span>{lang === 'bn' ? 'ভেরিফাইড একাউন্ট' : 'Verified Profile'}</span>
-                    </p>
-                  ) : (
-                    <button
-                      onClick={onOpenAuthModal}
-                      className="text-[10px] text-amber-600 hover:text-amber-700 flex items-center gap-1 font-bold cursor-pointer"
-                    >
-                      <AlertCircle className="w-2.5 h-2.5" />
-                      <span>{lang === 'bn' ? '⚠️ ভেরিফাই করুন' : '⚠️ Verify Now'}</span>
-                    </button>
-                  )}
+                  <p className="text-[10px] text-emerald-600 flex items-center gap-1 font-semibold">
+                    <CheckCircle2 className="w-2.5 h-2.5" />
+                    <span>{lang === 'bn' ? 'অ্যাক্টিভ' : 'Active'}</span>
+                  </p>
                 </div>
               </div>
               <button
@@ -176,7 +153,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs cursor-pointer ml-1"
             >
               <User className="w-3.5 h-3.5" />
-              <span>{lang === 'bn' ? 'লগইন / রেজিস্টার' : 'Sign In'}</span>
+              <span>{lang === 'bn' ? 'লগইন' : 'Sign In'}</span>
             </button>
           )}
         </div>

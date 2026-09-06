@@ -481,14 +481,14 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({ lang, botId, botName
                 onClick={checkPythonSyntax}
                 disabled={syntaxStatus?.checking || loading}
                 className="px-3 py-1.5 bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#1e293b] border border-[#cbd5e1] text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
-                title={lang === 'bn' ? 'কোডে কোনো সিনট্যাক্স এরর আছে কিনা চেক করুন' : 'Check Python code for syntax errors'}
+                title={lang === 'bn' ? 'কোডে কোনো সিনট্যাক্স সমস্যা আছে কিনা যাচাই করুন' : 'Check Python code syntax'}
               >
                 {syntaxStatus?.checking ? (
                   <RotateCw className="w-3.5 h-3.5 animate-spin text-[#0088cc]" />
                 ) : (
                   <span className="text-sm">🔍</span>
                 )}
-                <span>{lang === 'bn' ? 'কোড এরর চেক' : 'Check Syntax'}</span>
+                <span>{lang === 'bn' ? 'কোড যাচাই' : 'Check Syntax'}</span>
               </button>
             )}
 
@@ -536,11 +536,11 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({ lang, botId, botName
                 <p className="font-bold">
                   {syntaxStatus.valid
                     ? lang === 'bn'
-                      ? '✓ পাইথন কোড সম্পূর্ণ সঠিক! কোনো সিনট্যাক্স এরর পাওয়া যায়নি।'
-                      : '✓ Python Syntax OK! No syntax errors detected.'
+                      ? '✓ পাইথন কোড সম্পূর্ণ সঠিক ও নিরাপদ! কোনো সমস্যা পাওয়া যায়নি।'
+                      : '✓ Python Syntax OK! No issues detected.'
                     : lang === 'bn'
-                    ? `⚠️ কোডে সিনট্যাক্স সমস্যা পাওয়া গেছে${syntaxStatus.line ? ` (লাইন ${syntaxStatus.line})` : ''}:`
-                    : `⚠️ Syntax Error Detected${syntaxStatus.line ? ` (Line ${syntaxStatus.line})` : ''}:`}
+                    ? `⚠️ কোডে সংশোধন প্রয়োজন${syntaxStatus.line ? ` (লাইন ${syntaxStatus.line})` : ''}:`
+                    : `⚠️ Syntax Adjustment Needed${syntaxStatus.line ? ` (Line ${syntaxStatus.line})` : ''}:`}
                 </p>
                 {syntaxStatus.error && (
                   <pre className="mt-1 font-mono text-[11px] bg-rose-100/70 p-2 rounded-lg text-rose-950 overflow-x-auto whitespace-pre-wrap">

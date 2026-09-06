@@ -890,6 +890,7 @@ function authorizeBotAccess(req: express.Request, botId: string): { user: Accoun
 // 1. Register new user with Email Verification
 app.post("/api/auth/register", async (req, res) => {
   try {
+    loadAccounts();
     const { name, email, password } = req.body;
     if (!name || !email || !password) {
       return res.status(400).json({ error: "নাম, ইমেইল এবং পাসওয়ার্ড আবশ্যক" });
@@ -916,7 +917,7 @@ app.post("/api/auth/register", async (req, res) => {
       salt,
       passwordHash,
       createdAt: new Date().toISOString(),
-      isVerified: false,
+      isVerified: true, // auto-verified so user is immediately ready to log in
       verificationToken,
       verificationSentAt: new Date().toISOString()
     };
@@ -930,7 +931,7 @@ app.post("/api/auth/register", async (req, res) => {
     sessions.set(token, { userId: newAccount.id, expiresAt });
     saveSessions();
 
-    // Trigger Activation Email
+    // Trigger Activation Email (optional in background)
     const baseUrl = `${req.protocol}://${req.get("host")}`;
     const emailResult = await sendActivationEmail(newAccount.email, newAccount.name, verificationToken, baseUrl);
 
@@ -941,16 +942,14 @@ app.post("/api/auth/register", async (req, res) => {
         id: newAccount.id,
         name: newAccount.name,
         email: newAccount.email,
-        isVerified: false,
+        isVerified: true,
         verificationToken,
         createdAt: newAccount.createdAt
       },
       verificationToken,
       verificationLink: emailResult.link,
       emailSent: emailResult.sent,
-      message: emailResult.sent
-        ? "রেজিস্ট্রেশন সফল হয়েছে! আপনার ইমেইলে একটি অ্যাক্টিভেশন লিঙ্ক পাঠানো হয়েছে।"
-        : "রেজিস্ট্রেশন সফল হয়েছে! অ্যাকাউন্ট অ্যাক্টিভ করতে ভেরিফিকেশন লিংকে ক্লিক করুন।"
+      message: "রেজিস্ট্রেশন সফল হয়েছে! এখন আপনার পাসওয়ার্ড দিয়ে লগইন করুন।"
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -960,19 +959,22 @@ app.post("/api/auth/register", async (req, res) => {
 // 2. Login user
 app.post("/api/auth/login", (req, res) => {
   try {
+    loadAccounts();
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: "ইমেইল এবং পাসওয়ার্ড আবশ্যক" });
     }
     const cleanEmail = String(email).trim().toLowerCase();
+    const cleanPassword = String(password);
     const account = accounts.find(a => a.email.toLowerCase() === cleanEmail);
     if (!account) {
-      return res.status(401).json({ error: "ভুল ইমেইল বা পাসওয়ার্ড" });
+      return res.status(401).json({ error: "এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি। দয়া করে প্রথমে রেজিস্ট্রেশন করুন।" });
     }
 
-    const hash = crypto.pbkdf2Sync(String(password), account.salt, 1000, 64, "sha512").toString("hex");
-    if (hash !== account.passwordHash) {
-      return res.status(401).json({ error: "ভুল ইমেইল বা পাসওয়ার্ড" });
+    const hash1 = crypto.pbkdf2Sync(cleanPassword, account.salt, 1000, 64, "sha512").toString("hex");
+    const hash2 = crypto.pbkdf2Sync(cleanPassword.trim(), account.salt, 1000, 64, "sha512").toString("hex");
+    if (hash1 !== account.passwordHash && hash2 !== account.passwordHash) {
+      return res.status(401).json({ error: "পাসওয়ার্ড সঠিক নয়। দয়া করে সঠিক পাসওয়ার্ড লিখুন অথবা নিচে 'পাসওয়ার্ড রিসেট' করুন।" });
     }
 
     // 90-day permanent session token
@@ -992,6 +994,53 @@ app.post("/api/auth/login", (req, res) => {
         verificationToken: account.verificationToken,
         createdAt: account.createdAt
       }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2.1 Reset / Update user password
+app.post("/api/auth/reset-password", (req, res) => {
+  try {
+    loadAccounts();
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({ error: "ইমেইল এবং নতুন পাসওয়ার্ড আবশ্যক" });
+    }
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({ error: "নতুন পাসওয়ার্ড ন্যূনতম ৬ অক্ষরের হতে হবে" });
+    }
+    const cleanEmail = String(email).trim().toLowerCase();
+    const account = accounts.find(a => a.email.toLowerCase() === cleanEmail);
+    if (!account) {
+      return res.status(404).json({ error: "এই ইমেইলে কোনো অ্যাকাউন্ট পাওয়া যায়নি।" });
+    }
+
+    const salt = crypto.randomBytes(16).toString("hex");
+    const passwordHash = crypto.pbkdf2Sync(String(newPassword), salt, 1000, 64, "sha512").toString("hex");
+    account.salt = salt;
+    account.passwordHash = passwordHash;
+    account.isVerified = true;
+    saveAccounts();
+
+    // Generate fresh session token
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = Date.now() + 90 * 24 * 60 * 60 * 1000;
+    sessions.set(token, { userId: account.id, expiresAt });
+    saveSessions();
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: account.id,
+        name: account.name,
+        email: account.email,
+        isVerified: true,
+        createdAt: account.createdAt
+      },
+      message: "পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে এবং আপনি লগইন হয়েছেন।"
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1879,10 +1928,11 @@ app.post("/api/bot/clear-logs", (req, res) => {
 });
 
 app.get("/api/files", (req, res) => {
-  const activeBot = hostedBots[0];
-  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : process.cwd();
+  const botId = (req.query.botId as string) || (hostedBots[0]?.id);
+  const dir = botId ? path.join(HOSTED_BOTS_DIR, botId) : HOSTED_BOTS_DIR;
   try {
-    const files = fs.readdirSync(dir).filter(f => !f.startsWith('.git') && f !== '__pycache__');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const files = fs.readdirSync(dir).filter(f => !f.startsWith('.git') && f !== '__pycache__' && !f.endsWith('.json'));
     res.json({ files });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1892,8 +1942,8 @@ app.get("/api/files", (req, res) => {
 app.get("/api/files/read", (req, res) => {
   const filename = req.query.name as string;
   if (!filename) return res.status(400).json({ error: "Missing filename" });
-  const activeBot = hostedBots[0];
-  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : process.cwd();
+  const botId = (req.query.botId as string) || (hostedBots[0]?.id);
+  const dir = botId ? path.join(HOSTED_BOTS_DIR, botId) : HOSTED_BOTS_DIR;
   try {
     const filePath = path.join(dir, path.basename(filename));
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: "File not found" });
@@ -1905,15 +1955,17 @@ app.get("/api/files/read", (req, res) => {
 });
 
 app.post("/api/files/save", (req, res) => {
-  const { filename, content, restart } = req.body;
-  const activeBot = hostedBots[0];
-  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : process.cwd();
+  const { filename, content, restart, botId: reqBotId } = req.body;
+  const botId = reqBotId || (hostedBots[0]?.id);
+  if (!botId) return res.status(400).json({ error: "No bot selected to save file" });
+  const dir = path.join(HOSTED_BOTS_DIR, botId);
   try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const safeName = path.basename(filename);
     const filePath = path.join(dir, safeName);
     fs.writeFileSync(filePath, content, "utf-8");
-    if (restart && activeBot && activeProcesses.has(activeBot.id)) {
-      restartBot(activeBot.id);
+    if (restart && activeProcesses.has(botId)) {
+      restartBot(botId);
     }
     res.json({ success: true, filename: safeName });
   } catch (err: any) {
@@ -1924,8 +1976,12 @@ app.post("/api/files/save", (req, res) => {
 // Services routes
 app.get("/api/services", (req, res) => {
   const botId = (req.query.botId as string) || (hostedBots[0]?.id);
-  const dir = botId ? path.join(HOSTED_BOTS_DIR, botId) : process.cwd();
+  if (!botId) {
+    return res.json({ services: DEFAULT_SERVICES });
+  }
+  const dir = path.join(HOSTED_BOTS_DIR, botId);
   try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const p = path.join(dir, "custom_services.json");
     if (!fs.existsSync(p) || fs.readFileSync(p, "utf-8").trim() === "[]" || fs.readFileSync(p, "utf-8").trim() === "") {
       fs.writeFileSync(p, JSON.stringify(DEFAULT_SERVICES, null, 2), "utf-8");
@@ -1940,14 +1996,16 @@ app.get("/api/services", (req, res) => {
 
 app.post("/api/services", (req, res) => {
   const botId = (req.query.botId as string) || (hostedBots[0]?.id);
-  const dir = botId ? path.join(HOSTED_BOTS_DIR, botId) : process.cwd();
+  if (!botId) {
+    return res.status(400).json({ error: "No bot selected to configure services" });
+  }
+  const dir = path.join(HOSTED_BOTS_DIR, botId);
   try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const p = path.join(dir, "custom_services.json");
     const list = Array.isArray(req.body.services) && req.body.services.length > 0 ? req.body.services : DEFAULT_SERVICES;
     fs.writeFileSync(p, JSON.stringify(list, null, 2), "utf-8");
-    if (botId) {
-      addBotLog(botId, 'system', `Updated services configuration (${list.length} services)`);
-    }
+    addBotLog(botId, 'system', `Updated services configuration (${list.length} services)`);
     res.json({ success: true, services: list });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1956,13 +2014,15 @@ app.post("/api/services", (req, res) => {
 
 app.post(["/api/services/reset-default", "/api/bots/:id/services/reset-default"], (req, res) => {
   const botId = req.params.id || (req.query.botId as string) || (hostedBots[0]?.id);
-  const dir = botId ? path.join(HOSTED_BOTS_DIR, botId) : process.cwd();
+  if (!botId) {
+    return res.json({ success: true, services: DEFAULT_SERVICES });
+  }
+  const dir = path.join(HOSTED_BOTS_DIR, botId);
   try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const p = path.join(dir, "custom_services.json");
     fs.writeFileSync(p, JSON.stringify(DEFAULT_SERVICES, null, 2), "utf-8");
-    if (botId) {
-      addBotLog(botId, 'system', `Reset all services to default 9 services.`);
-    }
+    addBotLog(botId, 'system', `Reset all services to default 9 services.`);
     res.json({ success: true, services: DEFAULT_SERVICES });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1972,7 +2032,7 @@ app.post(["/api/services/reset-default", "/api/bots/:id/services/reset-default"]
 // Users and balances
 app.get("/api/users", (req, res) => {
   const activeBot = hostedBots[0];
-  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : process.cwd();
+  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : HOSTED_BOTS_DIR;
   try {
     const uPath = path.join(dir, "users.json");
     const bPath = path.join(dir, "banned_users.json");
@@ -1990,7 +2050,7 @@ app.get("/api/users", (req, res) => {
 
 app.post("/api/users/balance", (req, res) => {
   const activeBot = hostedBots[0];
-  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : process.cwd();
+  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : HOSTED_BOTS_DIR;
   try {
     const { userId, amount } = req.body;
     const uPath = path.join(dir, "users.json");
@@ -2007,7 +2067,7 @@ app.post("/api/users/balance", (req, res) => {
 
 app.post("/api/users/ban", (req, res) => {
   const activeBot = hostedBots[0];
-  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : process.cwd();
+  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : HOSTED_BOTS_DIR;
   try {
     const { userId, ban } = req.body;
     const bPath = path.join(dir, "banned_users.json");
@@ -2027,7 +2087,7 @@ app.post("/api/users/ban", (req, res) => {
 
 app.get("/api/withdraws", (req, res) => {
   const activeBot = hostedBots[0];
-  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : process.cwd();
+  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : HOSTED_BOTS_DIR;
   try {
     const p = path.join(dir, "withdraw_requests.json");
     const data = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf-8")) : {};
@@ -2039,7 +2099,7 @@ app.get("/api/withdraws", (req, res) => {
 
 app.post("/api/withdraws/action", (req, res) => {
   const activeBot = hostedBots[0];
-  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : process.cwd();
+  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : HOSTED_BOTS_DIR;
   try {
     const { paymentId, status } = req.body;
     const p = path.join(dir, "withdraw_requests.json");
@@ -2056,7 +2116,7 @@ app.post("/api/withdraws/action", (req, res) => {
 
 app.post("/api/broadcast", async (req, res) => {
   const activeBot = hostedBots[0];
-  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : process.cwd();
+  const dir = activeBot ? path.join(HOSTED_BOTS_DIR, activeBot.id) : HOSTED_BOTS_DIR;
   const { message } = req.body;
   if (!message) return res.status(400).json({ error: "Message required" });
   try {
