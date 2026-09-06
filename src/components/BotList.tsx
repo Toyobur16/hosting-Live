@@ -52,15 +52,15 @@ export const BotList: React.FC<BotListProps> = ({
     <div className="space-y-4">
       {/* Bot Deletion Confirmation Modal */}
       {botToDelete && (
-        <div className="fixed inset-0 bg-[#050811]/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-          <div className="bg-white border border-[#e2e8f0] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <div className="w-11 h-11 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mb-3">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-[#111827] border border-[#e2e8f0] dark:border-[#1f293d] rounded-2xl p-6 max-w-sm w-full shadow-2xl transition-colors">
+            <div className="w-11 h-11 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-3">
               <AlertTriangle className="w-6 h-6" />
             </div>
-            <h4 className="text-sm font-bold text-[#1e293b]">
+            <h4 className="text-sm font-bold text-[#1e293b] dark:text-white">
               {lang === 'bn' ? 'বট ডিলিট নিশ্চিত করুন' : 'Confirm Bot Deletion'}
             </h4>
-            <p className="text-xs text-[#64748b] mt-1.5 leading-relaxed">
+            <p className="text-xs text-[#64748b] dark:text-[#94a3b8] mt-1.5 leading-relaxed">
               {lang === 'bn'
                 ? `আপনি কি নিশ্চিত যে '${botToDelete.name}' বট এবং এর সমস্ত হোস্ট ফাইল স্থায়ীভাবে মুছে ফেলতে চান?`
                 : `Are you sure you want to permanently delete '${botToDelete.name}' and all its files?`}
@@ -68,7 +68,7 @@ export const BotList: React.FC<BotListProps> = ({
             <div className="mt-5 flex items-center justify-end gap-2">
               <button
                 onClick={() => setBotToDelete(null)}
-                className="px-3.5 py-2 rounded-xl bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#64748b] hover:text-[#1e293b] text-xs font-semibold border border-[#e2e8f0] cursor-pointer"
+                className="px-3.5 py-2 rounded-xl bg-[#f8fafc] dark:bg-[#1e293b] hover:bg-[#f1f5f9] dark:hover:bg-[#334155] text-[#64748b] dark:text-[#94a3b8] hover:text-[#1e293b] dark:hover:text-white text-xs font-semibold border border-[#e2e8f0] dark:border-[#334155] cursor-pointer transition-colors"
               >
                 {lang === 'bn' ? 'বাতিল' : 'Cancel'}
               </button>
@@ -77,7 +77,7 @@ export const BotList: React.FC<BotListProps> = ({
                   onDeleteBot(botToDelete.id);
                   setBotToDelete(null);
                 }}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-rose-600/20 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-rose-600/20 cursor-pointer transition-all"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{lang === 'bn' ? 'ডিলিট করুন' : 'Delete Bot'}</span>
@@ -88,21 +88,21 @@ export const BotList: React.FC<BotListProps> = ({
       )}
 
       {/* 24/7 Live Top Header Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white border border-[#e2e8f0] p-5 rounded-2xl shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-[#111827] border border-[#e2e8f0] dark:border-[#1f293d] p-5 rounded-2xl shadow-xs transition-colors">
         <div className="max-w-2xl">
           <div className="flex items-center gap-2 flex-wrap mb-1">
-            <h2 className="text-base font-bold text-[#1e293b]">
+            <h2 className="text-base font-bold text-[#1e293b] dark:text-white">
               {lang === 'bn' ? 'হোস্ট করা টেলিগ্রাম বটসমূহ' : 'Hosted Telegram Bots'}
             </h2>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#0088cc]/10 text-[#0088cc] border border-[#0088cc]/20 font-semibold">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#0088cc]/10 dark:bg-[#0088cc]/20 text-[#0088cc] border border-[#0088cc]/20 font-semibold">
               {bots.length} {lang === 'bn' ? 'টি বট' : 'Bots'}
             </span>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold flex items-center gap-1">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 font-semibold flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               {lang === 'bn' ? '২৪/৭ অটো-রানিং (অফলাইনেও লাইভ)' : '24/7 Background Live'}
             </span>
           </div>
-          <p className="text-xs text-[#64748b] leading-relaxed">
+          <p className="text-xs text-[#64748b] dark:text-[#94a3b8] leading-relaxed">
             {lang === 'bn'
               ? 'আপনার সমস্ত টেলিগ্রাম বট ক্লাউডে নিরবচ্ছিন্নভাবে চলছে। ব্রাউজার বন্ধ করলেও বট সক্রিয় থাকবে।'
               : 'All your hosted bots run 24/7 in the cloud. They remain online even when you are offline.'}
@@ -111,7 +111,7 @@ export const BotList: React.FC<BotListProps> = ({
 
         <button
           onClick={onOpenNewBotModal}
-          className="px-4 py-2.5 rounded-xl bg-[#0088cc] hover:bg-[#0077b5] text-white text-xs font-semibold shadow-sm shadow-[#0088cc]/20 flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02]"
+          className="px-4 py-2.5 rounded-xl bg-[#0088cc] hover:bg-[#0077b5] text-white text-xs font-semibold shadow-sm shadow-[#0088cc]/20 flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
         >
           <Plus className="w-4 h-4" />
           <span>{lang === 'bn' ? '+ নতুন বট হোস্ট করুন' : '+ Deploy New Bot'}</span>
@@ -120,14 +120,14 @@ export const BotList: React.FC<BotListProps> = ({
 
       {/* Empty State when no bots */}
       {bots.length === 0 && (
-        <div className="bg-white border border-[#e2e8f0] rounded-2xl p-10 text-center shadow-xs">
-          <div className="w-16 h-16 rounded-3xl bg-blue-50 border border-blue-200 text-[#0088cc] flex items-center justify-center mx-auto mb-4 shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-[#e2e8f0] dark:border-[#1f293d] rounded-2xl p-10 text-center shadow-xs transition-colors">
+          <div className="w-16 h-16 rounded-3xl bg-blue-50 dark:bg-[#0088cc]/10 border border-blue-200 dark:border-[#0088cc]/20 text-[#0088cc] flex items-center justify-center mx-auto mb-4 shadow-sm">
             <Bot className="w-8 h-8" />
           </div>
-          <h3 className="text-base font-bold text-[#1e293b]">
+          <h3 className="text-base font-bold text-[#1e293b] dark:text-white">
             {lang === 'bn' ? 'এখনো কোনো বট হোস্ট করা হয়নি' : 'No bots hosted yet'}
           </h3>
-          <p className="text-xs text-[#64748b] max-w-md mx-auto mt-1.5 leading-relaxed">
+          <p className="text-xs text-[#64748b] dark:text-[#94a3b8] max-w-md mx-auto mt-1.5 leading-relaxed">
             {lang === 'bn'
               ? 'আপনার নিজস্ব টেলিগ্রাম বট স্ক্রিপ্ট (.py) অথবা জিপ ফাইল আপলোড করে নিমেষেই ২৪/৭ ক্লাউড হোস্টিং শুরু করুন।'
               : 'Upload your Python bot files or zip archive to get instant 24/7 background hosting.'}
@@ -156,10 +156,10 @@ export const BotList: React.FC<BotListProps> = ({
               <div
                 key={bot.id}
                 onClick={() => onSelectBot(bot.id)}
-                className={`bg-white border rounded-2xl p-5 shadow-xs transition-all cursor-pointer flex flex-col justify-between relative ${
+                className={`bg-white dark:bg-[#111827] border rounded-2xl p-5 shadow-xs transition-all cursor-pointer flex flex-col justify-between relative ${
                   isSelected
-                    ? 'border-[#0088cc] ring-2 ring-[#0088cc]/20'
-                    : 'border-[#e2e8f0] hover:border-[#cbd5e1]'
+                    ? 'border-[#0088cc] dark:border-[#0088cc] ring-2 ring-[#0088cc]/20'
+                    : 'border-[#e2e8f0] dark:border-[#1f293d] hover:border-[#cbd5e1] dark:hover:border-[#334155]'
                 }`}
               >
                 <div>
@@ -167,7 +167,7 @@ export const BotList: React.FC<BotListProps> = ({
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-[#1e293b] truncate" title={bot.name}>
+                        <h3 className="text-sm font-bold text-[#1e293b] dark:text-white truncate" title={bot.name}>
                           {bot.name}
                         </h3>
                         {isSelected && (
@@ -177,7 +177,7 @@ export const BotList: React.FC<BotListProps> = ({
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs font-mono text-[#64748b] flex items-center gap-1">
+                        <span className="text-xs font-mono text-[#64748b] dark:text-[#94a3b8] flex items-center gap-1">
                           <FileCode className="w-3.5 h-3.5 text-[#94a3b8]" />
                           {bot.entryFile}
                         </span>
@@ -194,10 +194,10 @@ export const BotList: React.FC<BotListProps> = ({
                     <span
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider shrink-0 ${
                         isRunning
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
                           : isStarting
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                          : 'bg-rose-50 text-rose-700 border border-rose-200'
+                          ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                          : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
                       }`}
                     >
                       <span
@@ -214,16 +214,16 @@ export const BotList: React.FC<BotListProps> = ({
                   </div>
 
                   {/* 24/7 Cloud details */}
-                  <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-3 text-xs text-[#64748b] space-y-1.5 mb-4">
+                  <div className="bg-[#f8fafc] dark:bg-[#1e293b]/70 border border-[#e2e8f0] dark:border-[#334155] rounded-xl p-3 text-xs text-[#64748b] dark:text-[#94a3b8] space-y-1.5 mb-4">
                     <div className="flex items-center justify-between">
                       <span>{lang === 'bn' ? 'আপটাইম (লাইভ সময়):' : 'Live Uptime:'}</span>
-                      <span className="font-mono text-[#1e293b] font-semibold">
+                      <span className="font-mono text-[#1e293b] dark:text-white font-semibold">
                         {isRunning ? formatUptime(bot.uptimeSeconds) : '0s'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span>{lang === 'bn' ? 'হোস্ট করা ফাইলসমূহ:' : 'Hosted Files:'}</span>
-                      <span className="font-mono text-[#1e293b]">{bot.fileCount || 1} files</span>
+                      <span className="font-mono text-[#1e293b] dark:text-white">{bot.fileCount || 1} files</span>
                     </div>
                     {bot.ownerName && (
                       <div className="flex items-center justify-between text-[11px]">
@@ -231,12 +231,12 @@ export const BotList: React.FC<BotListProps> = ({
                         <span className="font-medium text-[#0088cc]">👤 {bot.ownerName}</span>
                       </div>
                     )}
-                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[#e2e8f0]">
-                      <span className="text-emerald-700 font-medium flex items-center gap-1">
-                        <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[#e2e8f0] dark:border-[#334155]">
+                      <span className="text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                         {lang === 'bn' ? 'অটো-রিস্টার্ট সুরক্ষা:' : 'Auto-Restart:'}
                       </span>
-                      <span className="text-emerald-700 font-bold">
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">
                         {lang === 'bn' ? 'সক্রিয় (২৪/৭)' : 'Active (24/7)'}
                       </span>
                     </div>
@@ -244,7 +244,7 @@ export const BotList: React.FC<BotListProps> = ({
                 </div>
 
                 {/* Action Buttons: Start, Stop, Restart, Console, Files, Delete */}
-                <div className="pt-3 border-t border-[#f1f5f9] flex items-center justify-between gap-1.5">
+                <div className="pt-3 border-t border-[#f1f5f9] dark:border-[#1f293d] flex items-center justify-between gap-1.5">
                   <div className="flex items-center gap-1">
                     {isRunning ? (
                       <button
@@ -252,7 +252,7 @@ export const BotList: React.FC<BotListProps> = ({
                           e.stopPropagation();
                           onStopBot(bot.id);
                         }}
-                        className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
+                        className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
                         title={lang === 'bn' ? 'বট বন্ধ করুন' : 'Stop Bot'}
                       >
                         <Square className="w-3.5 h-3.5 fill-current" />
@@ -275,7 +275,7 @@ export const BotList: React.FC<BotListProps> = ({
                         e.stopPropagation();
                         onRestartBot(bot.id);
                       }}
-                      className="p-2 rounded-xl bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#64748b] border border-[#e2e8f0] transition-colors cursor-pointer"
+                      className="p-2 rounded-xl bg-[#f8fafc] dark:bg-[#1e293b] hover:bg-[#f1f5f9] dark:hover:bg-[#334155] text-[#64748b] dark:text-[#94a3b8] border border-[#e2e8f0] dark:border-[#334155] transition-colors cursor-pointer"
                       title={lang === 'bn' ? 'রিস্টার্ট করুন' : 'Restart Bot'}
                     >
                       <RotateCw className="w-3.5 h-3.5" />
@@ -285,7 +285,7 @@ export const BotList: React.FC<BotListProps> = ({
                       href={`/api/bots/${bot.id}/export/zip`}
                       onClick={(e) => e.stopPropagation()}
                       download
-                      className="p-2 rounded-xl bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#64748b] border border-[#e2e8f0] transition-colors cursor-pointer"
+                      className="p-2 rounded-xl bg-[#f8fafc] dark:bg-[#1e293b] hover:bg-[#f1f5f9] dark:hover:bg-[#334155] text-[#64748b] dark:text-[#94a3b8] border border-[#e2e8f0] dark:border-[#334155] transition-colors cursor-pointer"
                       title={lang === 'bn' ? 'জিপ ফাইল ডাউনলোড করুন' : 'Download Zip'}
                     >
                       <Download className="w-3.5 h-3.5" />
@@ -293,7 +293,7 @@ export const BotList: React.FC<BotListProps> = ({
 
                     <button
                       onClick={(e) => handleCopyPing(e, bot.id)}
-                      className="p-2 rounded-xl bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#64748b] border border-[#e2e8f0] transition-colors cursor-pointer"
+                      className="p-2 rounded-xl bg-[#f8fafc] dark:bg-[#1e293b] hover:bg-[#f1f5f9] dark:hover:bg-[#334155] text-[#64748b] dark:text-[#94a3b8] border border-[#e2e8f0] dark:border-[#334155] transition-colors cursor-pointer"
                       title={lang === 'bn' ? '২৪/৭ কিপ-অ্যালাইভ পিং লিঙ্ক কপি করুন' : 'Copy 24/7 KeepAlive URL'}
                     >
                       {copiedId === bot.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Radio className="w-3.5 h-3.5 text-[#0088cc]" />}
@@ -310,7 +310,7 @@ export const BotList: React.FC<BotListProps> = ({
                       className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
                         isSelected
                           ? 'bg-[#0088cc]/10 text-[#0088cc]'
-                          : 'bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#64748b]'
+                          : 'bg-[#f8fafc] dark:bg-[#1e293b] hover:bg-[#f1f5f9] dark:hover:bg-[#334155] text-[#64748b] dark:text-[#94a3b8]'
                       }`}
                       title={lang === 'bn' ? 'লাইভ কনসোল ও লগ' : 'Live Console'}
                     >
@@ -325,7 +325,7 @@ export const BotList: React.FC<BotListProps> = ({
                           e.stopPropagation();
                           onOpenFileEditor(bot.id);
                         }}
-                        className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#64748b] hover:text-[#0088cc] border border-[#e2e8f0] transition-colors cursor-pointer flex items-center gap-1"
+                        className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-[#f8fafc] dark:bg-[#1e293b] hover:bg-[#f1f5f9] dark:hover:bg-[#334155] text-[#64748b] dark:text-[#94a3b8] hover:text-[#0088cc] dark:hover:text-[#0088cc] border border-[#e2e8f0] dark:border-[#334155] transition-colors cursor-pointer flex items-center gap-1"
                         title={lang === 'bn' ? 'কোড ও ফাইল ম্যানেজার' : 'Files & Code'}
                       >
                         <FileCode className="w-3 h-3" />
@@ -339,7 +339,7 @@ export const BotList: React.FC<BotListProps> = ({
                         e.stopPropagation();
                         setBotToDelete(bot);
                       }}
-                      className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors cursor-pointer"
+                      className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
                       title={lang === 'bn' ? `'${bot.name}' ডিলিট করুন` : `Delete bot '${bot.name}'`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Upload, FileCode, CheckCircle2, AlertCircle, Plus, ShieldCheck, Sparkles, Loader2 } from 'lucide-react';
+import { X, Upload, FileCode, CheckCircle2, AlertCircle, Plus, ShieldCheck, Sparkles, Loader2, Zap } from 'lucide-react';
 import { HostedBot } from '../types';
 
 interface NewBotModalProps {
@@ -89,9 +89,9 @@ print("🚀 Custom Python process started on BotHost Cloud!")
 counter = 0
 while True:
     counter += 1
-    print(f"[{time.strftime('%X')}] Process alive & running 24/7... tick #{counter}")
+    print(f"Heartbeat #{counter}: Active & Running smoothly")
     sys.stdout.flush()
-    time.sleep(10)
+    time.sleep(30)
 `
   }
 ];
@@ -114,7 +114,7 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
   const [tokenTesting, setTokenTesting] = useState(false);
   const [tokenInfo, setTokenInfo] = useState<{ ok: boolean; username?: string; error?: string } | null>(null);
 
-  // Handle file upload
+  // Fast file upload handler
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -124,18 +124,19 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
 
-      // Handle ZIP file
+      // Instant fast handling for ZIP file using FileReader.readAsDataURL
       if (file.name.toLowerCase().endsWith('.zip')) {
         try {
-          const buffer = await file.arrayBuffer();
-          const bytes = new Uint8Array(buffer);
-          let binary = '';
-          const chunkSize = 8192;
-          for (let j = 0; j < bytes.length; j += chunkSize) {
-            const chunk = bytes.subarray(j, j + chunkSize);
-            binary += String.fromCharCode.apply(null, Array.from(chunk));
-          }
-          const base64 = btoa(binary);
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const res = reader.result as string;
+              resolve(res.includes(',') ? res.split(',')[1] : res);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
           setZipBase64(base64);
           setZipFileName(file.name);
           if (!name) {
@@ -194,7 +195,7 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
     }
   };
 
-  // Deploy bot
+  // Deploy bot instantly
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -248,35 +249,35 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white border border-[#e2e8f0] rounded-2xl p-6 max-w-2xl w-full shadow-2xl my-8">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-white dark:bg-[#111827] border border-[#e2e8f0] dark:border-[#1f293d] rounded-2xl p-6 max-w-2xl w-full shadow-2xl my-8 transition-colors">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#f1f5f9] mb-5">
+        <div className="flex items-center justify-between pb-4 border-b border-[#f1f5f9] dark:border-[#1f293d] mb-5">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#0088cc]/10 flex items-center justify-center text-[#0088cc]">
+            <div className="w-9 h-9 rounded-xl bg-[#0088cc]/10 dark:bg-[#0088cc]/20 flex items-center justify-center text-[#0088cc]">
               <Plus className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-[#1e293b]">
+              <h3 className="text-base font-bold text-[#1e293b] dark:text-white">
                 {lang === 'bn' ? 'নতুন টেলিগ্রাম বট হোস্ট করুন' : 'Deploy New Telegram Bot'}
               </h3>
-              <p className="text-xs text-[#64748b]">
+              <p className="text-xs text-[#64748b] dark:text-[#94a3b8]">
                 {lang === 'bn'
-                  ? 'আপনার স্ক্রিপ্ট বা জিপ ফাইল আপলোড করে ২৪/৭ লাইভ হোস্ট করুন।'
+                  ? 'আপনার স্ক্রিপ্ট বা জিপ ফাইল দ্রুত আপলোড করে ২৪/৭ লাইভ হোস্ট করুন।'
                   : 'Upload your bot files (.py/.zip) and run 24/7 live on the cloud.'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-[#94a3b8] hover:text-[#1e293b] p-1.5 rounded-lg hover:bg-[#f8fafc] transition-colors cursor-pointer"
+            className="text-[#94a3b8] hover:text-[#1e293b] dark:hover:text-white p-1.5 rounded-lg hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {error && (
-          <div className="mb-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center gap-2">
+          <div className="mb-4 p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-300 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{error}</span>
           </div>
@@ -286,7 +287,7 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
           {/* Bot Name & Entry Script */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-[#1e293b] mb-1.5">
+              <label className="block text-xs font-semibold text-[#1e293b] dark:text-[#f3f4f6] mb-1.5">
                 {lang === 'bn' ? 'বটের নাম *' : 'Bot Name *'}
               </label>
               <input
@@ -294,12 +295,12 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={lang === 'bn' ? 'যেমন: SMS OTP Bot, Music Bot' : 'e.g. My Telegram Bot'}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] text-xs text-[#1e293b] placeholder-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#0088cc]"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#f8fafc] dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] text-xs text-[#1e293b] dark:text-white placeholder-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#0088cc]"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#1e293b] mb-1.5">
+              <label className="block text-xs font-semibold text-[#1e293b] dark:text-[#f3f4f6] mb-1.5">
                 {lang === 'bn' ? 'মেইন স্ক্রিপ্ট ফাইল' : 'Main Script File'}
               </label>
               <input
@@ -307,14 +308,14 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
                 value={entryFile}
                 onChange={(e) => setEntryFile(e.target.value)}
                 placeholder="bot.py"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] text-xs font-mono text-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#0088cc]"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#f8fafc] dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] text-xs font-mono text-[#1e293b] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0088cc]"
               />
             </div>
           </div>
 
           {/* Telegram Bot Token with Verification */}
           <div>
-            <label className="block text-xs font-semibold text-[#1e293b] mb-1.5">
+            <label className="block text-xs font-semibold text-[#1e293b] dark:text-[#f3f4f6] mb-1.5">
               {lang === 'bn' ? 'টেলিগ্রাম বট টোকেন (ঐচ্ছিক)' : 'Telegram Bot Token (Optional)'}
             </label>
             <div className="flex gap-2">
@@ -323,13 +324,13 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
                 placeholder="8814477083:AAH_G8v9gg3YRyVUyYvVRZ65Y_ZIT2nffJM"
-                className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] text-xs font-mono text-[#1e293b] placeholder-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#0088cc]"
+                className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#f8fafc] dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] text-xs font-mono text-[#1e293b] dark:text-white placeholder-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#0088cc]"
               />
               <button
                 type="button"
                 onClick={handleTestToken}
                 disabled={!token.trim() || tokenTesting}
-                className="px-3.5 py-2.5 rounded-xl bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#0088cc] border border-[#e2e8f0] text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="px-3.5 py-2.5 rounded-xl bg-[#f8fafc] dark:bg-[#1e293b] hover:bg-[#f1f5f9] dark:hover:bg-[#334155] text-[#0088cc] border border-[#e2e8f0] dark:border-[#334155] text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 {tokenTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
                 <span>{lang === 'bn' ? 'যাচাই' : 'Verify'}</span>
@@ -337,7 +338,9 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
             </div>
             {tokenInfo && (
               <div className={`mt-2 p-2.5 rounded-lg text-xs flex items-center gap-2 ${
-                tokenInfo.ok ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
+                tokenInfo.ok 
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' 
+                  : 'bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
               }`}>
                 {tokenInfo.ok ? (
                   <>
@@ -358,11 +361,11 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
           </div>
 
           {/* SMS Panel & API Key Configuration (Optional) */}
-          <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-3.5">
+          <div className="bg-[#f8fafc] dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] rounded-xl p-3.5">
             <button
               type="button"
               onClick={() => setShowSmsPanelOptions(!showSmsPanelOptions)}
-              className="w-full flex items-center justify-between text-xs font-semibold text-[#1e293b] cursor-pointer"
+              className="w-full flex items-center justify-between text-xs font-semibold text-[#1e293b] dark:text-[#f3f4f6] cursor-pointer"
             >
               <div className="flex items-center gap-2">
                 <span className="text-sm">🌐</span>
@@ -373,9 +376,9 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
               </span>
             </button>
             {showSmsPanelOptions && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-[#e2e8f0]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-[#e2e8f0] dark:border-[#334155]">
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#64748b] mb-1">
+                  <label className="block text-[11px] font-semibold text-[#64748b] dark:text-[#94a3b8] mb-1">
                     {lang === 'bn' ? 'প্যানেল সাইট URL' : 'Site Base URL'}
                   </label>
                   <input
@@ -383,12 +386,12 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
                     value={baseUrl}
                     onChange={(e) => setBaseUrl(e.target.value)}
                     placeholder="https://minosms.com"
-                    className="w-full px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-xs font-mono text-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#0088cc]"
+                    className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#0f172a] border border-[#e2e8f0] dark:border-[#334155] text-xs font-mono text-[#1e293b] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0088cc]"
                   />
                   <span className="text-[10px] text-[#94a3b8] mt-0.5 block">Default: https://minosms.com</span>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#64748b] mb-1">
+                  <label className="block text-[11px] font-semibold text-[#64748b] dark:text-[#94a3b8] mb-1">
                     {lang === 'bn' ? 'প্যানেল API Key' : 'SMS API Key'}
                   </label>
                   <input
@@ -396,7 +399,7 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     placeholder="mino_live_..."
-                    className="w-full px-3 py-1.5 rounded-lg bg-white border border-[#e2e8f0] text-xs font-mono text-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#0088cc]"
+                    className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#0f172a] border border-[#e2e8f0] dark:border-[#334155] text-xs font-mono text-[#1e293b] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0088cc]"
                   />
                 </div>
               </div>
@@ -406,15 +409,17 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
           {/* Mode Tabs: Upload vs Paste */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-[#1e293b]">
+              <label className="text-xs font-semibold text-[#1e293b] dark:text-[#f3f4f6]">
                 {lang === 'bn' ? 'বটের কোড ও ফাইলসমূহ' : 'Bot Code & Files'}
               </label>
-              <div className="flex bg-[#f8fafc] p-1 rounded-xl border border-[#e2e8f0]">
+              <div className="flex bg-[#f8fafc] dark:bg-[#1e293b] p-1 rounded-xl border border-[#e2e8f0] dark:border-[#334155]">
                 <button
                   type="button"
                   onClick={() => setInputMode('upload')}
                   className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    inputMode === 'upload' ? 'bg-white text-[#0088cc] shadow-xs' : 'text-[#64748b]'
+                    inputMode === 'upload' 
+                      ? 'bg-white dark:bg-[#0f172a] text-[#0088cc] shadow-xs' 
+                      : 'text-[#64748b] dark:text-[#94a3b8]'
                   }`}
                 >
                   <Upload className="w-3.5 h-3.5 inline mr-1" />
@@ -424,7 +429,9 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
                   type="button"
                   onClick={() => setInputMode('paste')}
                   className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    inputMode === 'paste' ? 'bg-white text-[#0088cc] shadow-xs' : 'text-[#64748b]'
+                    inputMode === 'paste' 
+                      ? 'bg-white dark:bg-[#0f172a] text-[#0088cc] shadow-xs' 
+                      : 'text-[#64748b] dark:text-[#94a3b8]'
                   }`}
                 >
                   <FileCode className="w-3.5 h-3.5 inline mr-1" />
@@ -434,7 +441,7 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
             </div>
 
             {inputMode === 'upload' ? (
-              <div className="border-2 border-dashed border-[#cbd5e1] hover:border-[#0088cc] rounded-2xl p-6 text-center transition-colors bg-[#f8fafc]/50">
+              <div className="border-2 border-dashed border-[#cbd5e1] dark:border-[#334155] hover:border-[#0088cc] rounded-2xl p-6 text-center transition-colors bg-[#f8fafc]/50 dark:bg-[#1e293b]/40">
                 <input
                   type="file"
                   id="bot-file-input"
@@ -444,35 +451,36 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
                   className="hidden"
                 />
                 <label htmlFor="bot-file-input" className="cursor-pointer flex flex-col items-center">
-                  <div className="w-12 h-12 rounded-2xl bg-[#0088cc]/10 text-[#0088cc] flex items-center justify-center mb-3">
+                  <div className="w-12 h-12 rounded-2xl bg-[#0088cc]/10 dark:bg-[#0088cc]/20 text-[#0088cc] flex items-center justify-center mb-3">
                     <Upload className="w-6 h-6" />
                   </div>
-                  <span className="text-xs font-bold text-[#1e293b]">
+                  <span className="text-xs font-bold text-[#1e293b] dark:text-white">
                     {lang === 'bn' ? 'ফাইল বা সম্পূর্ণ প্রজেক্ট (.zip) নির্বাচন করুন' : 'Click to select or drag & drop files / .zip archive'}
                   </span>
-                  <span className="text-[11px] text-[#64748b] mt-1">
+                  <span className="text-[11px] text-[#64748b] dark:text-[#94a3b8] mt-1">
                     {lang === 'bn' ? 'সাপোর্ট: .py (Python স্ক্রিপ্ট), .zip (বট ফাইল), .json, .txt' : 'Supports: .py (Python script), .zip (bot archive), .json, requirements.txt'}
                   </span>
-                  <span className="text-[10px] text-emerald-600 font-medium mt-1">
-                    {lang === 'bn' ? '✓ প্রয়োজনীয় প্যাকেজসমূহ স্বয়ংক্রিয়ভাবে ইনস্টল হবে' : '✓ Required packages auto-install'}
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-amber-500" />
+                    {lang === 'bn' ? '⚡ দ্রুত আপলোড ও ইনস্ট্যান্ট হোস্টিং প্রস্তুত' : '⚡ Fast upload & instant 24/7 cloud hosting'}
                   </span>
                 </label>
 
                 {(uploadedFiles.length > 0 || zipFileName) && (
-                  <div className="mt-4 pt-3 border-t border-[#e2e8f0] text-left">
-                    <span className="text-[11px] font-semibold text-[#64748b] uppercase tracking-wider block mb-2">
+                  <div className="mt-4 pt-3 border-t border-[#e2e8f0] dark:border-[#334155] text-left">
+                    <span className="text-[11px] font-semibold text-[#64748b] dark:text-[#94a3b8] uppercase tracking-wider block mb-2">
                       {lang === 'bn' ? 'নির্বাচিত ফাইলসমূহ:' : 'Selected Files:'}
                     </span>
                     <div className="flex flex-wrap gap-2">
                       {zipFileName && (
-                        <div className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-mono text-emerald-700 flex items-center gap-1.5 font-semibold">
+                        <div className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs font-mono text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5 font-semibold">
                           <FileCode className="w-3.5 h-3.5 text-emerald-600" />
                           <span>📦 {zipFileName}</span>
-                          <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">ZIP Archive</span>
+                          <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 px-1.5 py-0.5 rounded">ZIP Archive</span>
                         </div>
                       )}
                       {uploadedFiles.map((f, i) => (
-                        <div key={i} className="px-2.5 py-1 rounded-lg bg-white border border-[#e2e8f0] text-xs font-mono text-[#0088cc] flex items-center gap-1.5">
+                        <div key={i} className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] text-xs font-mono text-[#0088cc] flex items-center gap-1.5">
                           <FileCode className="w-3.5 h-3.5 text-[#64748b]" />
                           <span>{f.name}</span>
                           <span className="text-[10px] text-[#94a3b8]">({(f.content.length / 1024).toFixed(1)} KB)</span>
@@ -485,7 +493,7 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
             ) : (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                  <span className="text-xs text-[#64748b] font-medium shrink-0 flex items-center gap-1">
+                  <span className="text-xs text-[#64748b] dark:text-[#94a3b8] font-medium shrink-0 flex items-center gap-1">
                     <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                     {lang === 'bn' ? 'স্টার্টার টেমপ্লেট:' : 'Quick Starters:'}
                   </span>
@@ -498,7 +506,7 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
                         setEntryFile(t.entry);
                         if (!name) setName(t.name);
                       }}
-                      className="px-2.5 py-1 rounded-lg bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#1e293b] border border-[#e2e8f0] text-xs font-medium shrink-0 cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg bg-[#f8fafc] dark:bg-[#1e293b] hover:bg-[#f1f5f9] dark:hover:bg-[#334155] text-[#1e293b] dark:text-white border border-[#e2e8f0] dark:border-[#334155] text-xs font-medium shrink-0 cursor-pointer"
                     >
                       {t.name}
                     </button>
@@ -508,7 +516,7 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   rows={8}
-                  className="w-full p-3 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] text-xs font-mono text-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#0088cc]"
+                  className="w-full p-3 rounded-xl bg-[#f8fafc] dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] text-xs font-mono text-[#1e293b] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0088cc]"
                   placeholder="# Paste your python bot code here..."
                 />
               </div>
@@ -516,7 +524,7 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
           </div>
 
           {/* 24/7 Auto Start Option */}
-          <div className="flex items-center gap-2 pt-1 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100">
+          <div className="flex items-center gap-2 pt-1 bg-emerald-50/50 dark:bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-900/50">
             <input
               type="checkbox"
               id="auto-start"
@@ -524,27 +532,36 @@ export const NewBotModal: React.FC<NewBotModalProps> = ({ onClose, onCreated, la
               onChange={(e) => setAutoStart(e.target.checked)}
               className="w-4 h-4 rounded text-[#0088cc] border-[#cbd5e1] focus:ring-[#0088cc] cursor-pointer"
             />
-            <label htmlFor="auto-start" className="text-xs text-emerald-800 font-semibold cursor-pointer">
+            <label htmlFor="auto-start" className="text-xs text-emerald-800 dark:text-emerald-300 font-semibold cursor-pointer">
               {lang === 'bn' ? '২৪/৭ ব্যাকগ্রাউন্ডে অনবরত চালু রাখুন (অফলাইনেও লাইভ থাকবে)' : 'Run 24/7 continuously in background (works offline)'}
             </label>
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#f1f5f9]">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#f1f5f9] dark:border-[#1f293d]">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#64748b] hover:text-[#1e293b] text-xs font-semibold border border-[#e2e8f0] cursor-pointer transition-colors"
+              className="px-4 py-2 rounded-xl bg-[#f8fafc] dark:bg-[#1e293b] hover:bg-[#f1f5f9] dark:hover:bg-[#334155] text-[#64748b] hover:text-[#1e293b] dark:text-[#94a3b8] dark:hover:text-white text-xs font-semibold border border-[#e2e8f0] dark:border-[#334155] cursor-pointer transition-colors"
             >
               {lang === 'bn' ? 'বাতিল' : 'Cancel'}
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2.5 rounded-xl bg-[#0088cc] hover:bg-[#0077b5] text-white text-xs font-semibold shadow-sm shadow-[#0088cc]/20 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all"
+              className="px-5 py-2.5 rounded-xl bg-[#0088cc] hover:bg-[#0077b5] text-white text-xs font-semibold shadow-sm shadow-[#0088cc]/20 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              <span>{lang === 'bn' ? 'হোস্ট ও ২৪/৭ চালু করুন' : 'Deploy & Run 24/7 Live'}</span>
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{lang === 'bn' ? '⚡ দ্রুত হোস্টিং শুরু হচ্ছে...' : '⚡ Launching 24/7 Live...'}</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  <span>{lang === 'bn' ? 'হোস্ট ও ২৪/৭ চালু করুন' : 'Deploy & Run 24/7 Live'}</span>
+                </>
+              )}
             </button>
           </div>
         </form>

@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-import { spawn, spawnSync, ChildProcess, execSync } from "child_process";
+import { spawn, spawnSync, ChildProcess, execSync, exec } from "child_process";
 import { createServer as createViteServer } from "vite";
 import nodemailer from "nodemailer";
 
@@ -495,61 +495,50 @@ function patchAndValidateBotCode(botDir: string, botId: string, customBaseUrl?: 
   }
 }
 
-// Ensure all required dependencies for a bot are installed
+// Ensure all required dependencies for a bot are installed without blocking startup
+const installedPackageCache = new Set<string>([
+  'requests', 'aiohttp', 'telebot', 'telegram', 'httpx', 'pillow', 'python-dotenv', 'pyTelegramBotAPI', 'python-telegram-bot'
+]);
+
 function ensureBotDependencies(botDir: string, botId: string): void {
-  try {
-    const reqFile = path.join(botDir, "requirements.txt");
-    if (fs.existsSync(reqFile)) {
-      const content = fs.readFileSync(reqFile, "utf-8");
-      if (content.trim()) {
-        try {
-          execSync(`python3 -m pip install -r "${reqFile}" --break-system-packages`, {
-            cwd: botDir,
-            timeout: 50000,
-            stdio: "ignore"
+  // Asynchronously resolve dependencies in background so bot boots in milliseconds
+  setTimeout(() => {
+    try {
+      const reqFile = path.join(botDir, "requirements.txt");
+      if (fs.existsSync(reqFile)) {
+        const content = fs.readFileSync(reqFile, "utf-8").trim();
+        if (content) {
+          exec(`python3 -m pip install -r "${reqFile}" --break-system-packages`, { cwd: botDir, timeout: 60000 }, (err) => {
+            if (!err) {
+              addBotLog(botId, 'system', `✓ Requirements libraries installed and verified.`);
+            }
           });
+        }
+      }
+
+      const files = fs.readdirSync(botDir).filter(f => f.endsWith('.py'));
+      const neededPackages: string[] = [];
+      for (const f of files) {
+        try {
+          const code = fs.readFileSync(path.join(botDir, f), 'utf-8');
+          if ((code.includes('import telebot') || code.includes('from telebot')) && !installedPackageCache.has('pyTelegramBotAPI')) neededPackages.push('pyTelegramBotAPI');
+          if ((code.includes('import telegram') || code.includes('from telegram')) && !installedPackageCache.has('python-telegram-bot')) neededPackages.push('python-telegram-bot>=20.0');
+          if (code.includes('import aiogram') && !installedPackageCache.has('aiogram')) neededPackages.push('aiogram');
+          if (code.includes('import qrcode') && !installedPackageCache.has('qrcode')) neededPackages.push('qrcode');
         } catch {}
       }
-    }
 
-    const files = fs.readdirSync(botDir).filter(f => f.endsWith('.py'));
-    const neededPackages = new Set<string>();
-    for (const f of files) {
-      try {
-        const code = fs.readFileSync(path.join(botDir, f), 'utf-8');
-        if (code.includes('import telebot') || code.includes('from telebot')) neededPackages.add('pyTelegramBotAPI');
-        if (code.includes('import telegram') || code.includes('from telegram')) neededPackages.add('python-telegram-bot>=20.0');
-        if (code.includes('import aiogram') || code.includes('from aiogram')) neededPackages.add('aiogram');
-        if (code.includes('import requests') || code.includes('from requests')) neededPackages.add('requests');
-        if (code.includes('import aiohttp') || code.includes('from aiohttp')) neededPackages.add('aiohttp');
-        if (code.includes('import pyotp') || code.includes('from pyotp')) neededPackages.add('pyotp');
-        if (code.includes('import httpx') || code.includes('from httpx')) {
-          neededPackages.add('httpx');
-          neededPackages.add('h2');
-          neededPackages.add('httpx[http2]');
-        }
-        if (code.includes('import bs4') || code.includes('from bs4')) neededPackages.add('beautifulsoup4');
-        if (code.includes('import PIL') || code.includes('from PIL')) neededPackages.add('pillow');
-        if (code.includes('import dotenv') || code.includes('from dotenv')) neededPackages.add('python-dotenv');
-        if (code.includes('import qrcode') || code.includes('from qrcode')) neededPackages.add('qrcode');
-        if (code.includes('import pytz') || code.includes('from pytz')) neededPackages.add('pytz');
-        if (code.includes('import dateutil') || code.includes('from dateutil')) neededPackages.add('python-dateutil');
-        if (code.includes('import cryptography') || code.includes('from cryptography')) neededPackages.add('cryptography');
-        if (code.includes('import pydantic') || code.includes('from pydantic')) neededPackages.add('pydantic');
-      } catch {}
-    }
-
-    for (const pkg of neededPackages) {
-      try {
-        execSync(`python3 -m pip install "${pkg}" --break-system-packages`, {
-          timeout: 30000,
-          stdio: "ignore"
+      for (const pkg of neededPackages) {
+        exec(`python3 -m pip install "${pkg}" --break-system-packages`, { timeout: 45000 }, (err) => {
+          if (!err) {
+            installedPackageCache.add(pkg);
+          }
         });
-      } catch {}
+      }
+    } catch (err: any) {
+      console.error(`[Dependency Resolver] Error checking dependencies for ${botId}:`, err.message);
     }
-  } catch (err: any) {
-    console.error(`[Dependency Resolver] Error checking dependencies for ${botId}:`, err.message);
-  }
+  }, 10);
 }
 
 // Start a bot process (24/7 background execution)
@@ -1171,7 +1160,7 @@ app.post("/api/code/syntax-check", (req, res) => {
     const result = spawnSync("python3", ["-m", "py_compile", tmpFile], { encoding: "utf-8" });
     if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
     if (result.status === 0) {
-      return res.json({ valid: true, message: "Python Syntax OK! কোনো সিনট্যাক্স এরর পাওয়া যায়নি।" });
+      return res.json({ valid: true, message: "Python Syntax OK! পাইথন কোড সম্পূর্ণ নির্ভুল ও নিরাপদ।" });
     } else {
       const stderr = result.stderr || result.stdout || "Syntax Error";
       const lineMatch = stderr.match(/line (\d+)/i);

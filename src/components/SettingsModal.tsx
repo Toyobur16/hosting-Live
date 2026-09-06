@@ -54,7 +54,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       titleEn: 'File Upload & Script Editor',
       descBn: 'বটের কোড এডিট করুন, নতুন ফাইল আপলোড ও জিপ এক্সপোর্ট করুন',
       descEn: 'Edit bot code, upload files and inspect syntax',
-      color: 'text-indigo-600 bg-indigo-50 border-indigo-200'
+      color: 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800'
     },
     {
       id: 'database',
@@ -63,7 +63,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       titleEn: 'Database & Cloud Storage',
       descBn: 'ডাটাবেজ ব্যাকআপ ডাউনলোড করুন এবং ফাইল লোকেশন দেখুন',
       descEn: 'Download full JSON database backup and inspect storage',
-      color: 'text-emerald-600 bg-emerald-50 border-emerald-200'
+      color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800'
     },
     {
       id: 'pip',
@@ -72,7 +72,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       titleEn: 'Python Pip Packages',
       descBn: 'telebot, aiogram, requests সহ যেকোনো লাইব্রেরি ইনস্টল করুন',
       descEn: 'Install telebot, aiogram, requests and python packages',
-      color: 'text-sky-600 bg-sky-50 border-sky-200',
+      color: 'text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800',
       isAction: true,
       action: () => setShowPip(true)
     },
@@ -83,7 +83,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       titleEn: 'Services & SMS Gateway',
       descBn: 'টেলিগ্রাম এসএমএস এবং অটোমেশন সার্ভিস রেট কনফিগার করুন',
       descEn: 'Configure Telegram SMS services and rates',
-      color: 'text-amber-600 bg-amber-50 border-amber-200'
+      color: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800'
     },
     {
       id: 'users',
@@ -92,7 +92,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       titleEn: 'Users & Balances',
       descBn: 'নিবন্ধিত ইউজার তালিকা ও হোস্টিং কোটা নিয়ন্ত্রণ করুন',
       descEn: 'Manage registered users, balances and quotas',
-      color: 'text-purple-600 bg-purple-50 border-purple-200'
+      color: 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800'
     },
     {
       id: 'token_test',
@@ -101,7 +101,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       titleEn: 'Verify Bot Token',
       descBn: 'অফিসিয়াল টেলিগ্রাম API দিয়ে বটের টোকেন বৈধতা পরীক্ষা করুন',
       descEn: 'Verify bot token with official Telegram API',
-      color: 'text-blue-600 bg-blue-50 border-blue-200',
+      color: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800',
       isAction: true,
       action: () => {
         onClose();
@@ -115,7 +115,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       titleEn: 'Admin Broadcast Notice',
       descBn: 'সাইটের সকল সক্রিয় ইউজারকে নোটিশ বার্তা পাঠান',
       descEn: 'Send announcement to all registered users',
-      color: 'text-rose-600 bg-rose-50 border-rose-200',
+      color: 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800',
       isAction: true,
       action: () => setShowBroadcast(true)
     },
@@ -126,36 +126,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       titleEn: '24/7 Hosting Guide',
       descBn: 'টেলিগ্রাম বট তৈরি, টোকেন সংগ্রহ ও হোস্টিং করার পূর্ণাঙ্গ গাইড',
       descEn: 'Step by step guide to build and host telegram bots',
-      color: 'text-teal-600 bg-teal-50 border-teal-200'
+      color: 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800'
     }
   ];
 
   return (
     <>
-      <div className="fixed inset-0 bg-[#050811]/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 z-50 animate-in fade-in duration-200">
-        <div className="bg-white border border-[#e2e8f0] rounded-3xl max-w-5xl w-full h-[88vh] max-h-[850px] shadow-2xl flex flex-col overflow-hidden">
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 z-50 animate-in fade-in duration-200">
+        <div className="bg-white dark:bg-[#111827] border border-[#e2e8f0] dark:border-[#1f293d] rounded-3xl max-w-5xl w-full h-[88vh] max-h-[850px] shadow-2xl flex flex-col overflow-hidden transition-colors">
           {/* Modal Header */}
-          <div className="px-6 py-4 border-b border-[#e2e8f0] flex items-center justify-between bg-[#f8fafc]">
+          <div className="px-6 py-4 border-b border-[#e2e8f0] dark:border-[#1f293d] flex items-center justify-between bg-[#f8fafc] dark:bg-[#111827]">
             <div className="flex items-center gap-3">
               {activeTab !== 'overview' && (
                 <button
                   onClick={() => setActiveTab('overview')}
-                  className="p-1.5 rounded-xl hover:bg-[#e2e8f0] text-[#64748b] hover:text-[#1e293b] transition-colors cursor-pointer"
+                  className="p-1.5 rounded-xl hover:bg-[#e2e8f0] dark:hover:bg-[#1f293d] text-[#64748b] dark:text-[#94a3b8] hover:text-[#1e293b] dark:hover:text-white transition-colors cursor-pointer"
                   title="Back to Settings Menu"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
               )}
-              <div className="w-10 h-10 rounded-2xl bg-[#0088cc]/10 border border-[#0088cc]/20 flex items-center justify-center text-[#0088cc]">
+              <div className="w-10 h-10 rounded-2xl bg-[#0088cc]/10 dark:bg-[#0088cc]/20 border border-[#0088cc]/20 flex items-center justify-center text-[#0088cc]">
                 <Settings className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-[#1e293b]">
+                <h3 className="text-base font-bold text-[#1e293b] dark:text-white">
                   {activeTab === 'overview'
                     ? (lang === 'bn' ? 'কন্ট্রোল সেন্টার ও সেটিংস' : 'Control Center & Settings')
                     : SETTING_ITEMS.find((i) => i.id === activeTab)?.titleBn || 'Settings'}
                 </h3>
-                <p className="text-xs text-[#64748b]">
+                <p className="text-xs text-[#64748b] dark:text-[#94a3b8]">
                   {activeTab === 'overview'
                     ? (lang === 'bn' ? 'হোস্টিং প্ল্যাটফর্মের সমস্ত ম্যানেজমেন্ট টুলস ও কনফিগারেশন' : 'Advanced management tools, files and configuration')
                     : SETTING_ITEMS.find((i) => i.id === activeTab)?.descBn || ''}
@@ -167,7 +167,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {activeTab !== 'overview' && (
                 <button
                   onClick={() => setActiveTab('overview')}
-                  className="px-3 py-1.5 rounded-xl bg-white border border-[#e2e8f0] text-xs font-semibold text-[#64748b] hover:text-[#1e293b] hover:bg-[#f1f5f9] transition-all cursor-pointer hidden sm:flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] text-xs font-semibold text-[#64748b] dark:text-[#94a3b8] hover:text-[#1e293b] dark:hover:text-white hover:bg-[#f1f5f9] dark:hover:bg-[#334155] transition-all cursor-pointer hidden sm:flex items-center gap-1.5"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>{lang === 'bn' ? 'মেন্যুতে ফিরুন' : 'Back to Menu'}</span>
@@ -175,7 +175,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
               <button
                 onClick={onClose}
-                className="p-2 rounded-xl text-[#94a3b8] hover:text-[#1e293b] hover:bg-[#e2e8f0] transition-colors cursor-pointer"
+                className="p-2 rounded-xl text-[#94a3b8] hover:text-[#1e293b] dark:hover:text-white hover:bg-[#e2e8f0] dark:hover:bg-[#1e293b] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -183,28 +183,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* Modal Content Body */}
-          <div className="flex-1 overflow-y-auto p-5 sm:p-7">
+          <div className="flex-1 overflow-y-auto p-5 sm:p-7 text-[#1e293b] dark:text-[#f3f4f6]">
             {activeTab === 'overview' ? (
               <div className="space-y-6">
                 {/* User Profile Banner */}
                 {currentUser && (
-                  <div className="p-4 bg-gradient-to-r from-slate-50 to-blue-50/50 border border-[#e2e8f0] rounded-2xl flex flex-wrap items-center justify-between gap-3">
+                  <div className="p-4 bg-gradient-to-r from-slate-50 dark:from-[#1e293b]/70 to-blue-50/50 dark:to-blue-950/30 border border-[#e2e8f0] dark:border-[#1f293d] rounded-2xl flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <div className="w-11 h-11 rounded-2xl bg-[#0088cc] text-white flex items-center justify-center font-bold text-base shadow-sm">
                         {currentUser.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-bold text-[#1e293b]">{currentUser.name}</h4>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                          <h4 className="text-sm font-bold text-[#1e293b] dark:text-white">{currentUser.name}</h4>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800">
                             {lang === 'bn' ? 'সক্রিয় অ্যাকাউন্ট' : 'Active Account'}
                           </span>
                         </div>
-                        <p className="text-xs text-[#64748b] font-mono mt-0.5">{currentUser.email}</p>
+                        <p className="text-xs text-[#64748b] dark:text-[#94a3b8] font-mono mt-0.5">{currentUser.email}</p>
                       </div>
                     </div>
 
-                    <div className="text-xs text-[#64748b] flex items-center gap-2">
+                    <div className="text-xs text-[#64748b] dark:text-[#94a3b8] flex items-center gap-2">
                       <HardDrive className="w-4 h-4 text-[#0088cc]" />
                       <span>{bots.length} {lang === 'bn' ? 'টি বট হোস্টেড' : 'Bots Hosted'}</span>
                     </div>
@@ -213,14 +213,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 {/* Bot Selector if editing files */}
                 {bots.length > 1 && (
-                  <div className="flex items-center justify-between p-3 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl text-xs">
-                    <span className="font-semibold text-[#1e293b]">
+                  <div className="flex items-center justify-between p-3 bg-[#f8fafc] dark:bg-[#1e293b]/70 border border-[#e2e8f0] dark:border-[#334155] rounded-xl text-xs">
+                    <span className="font-semibold text-[#1e293b] dark:text-white">
                       {lang === 'bn' ? 'ডিফল্ট নির্বাচিত বট:' : 'Default Selected Bot:'}
                     </span>
                     <select
                       value={selectedBotId || ''}
                       onChange={(e) => onSelectBot(e.target.value)}
-                      className="bg-white border border-[#cbd5e1] rounded-lg px-3 py-1 font-medium text-[#1e293b] cursor-pointer"
+                      className="bg-white dark:bg-[#111827] border border-[#cbd5e1] dark:border-[#334155] rounded-lg px-3 py-1 font-medium text-[#1e293b] dark:text-white cursor-pointer"
                     >
                       {bots.map((b) => (
                         <option key={b.id} value={b.id}>
@@ -245,17 +245,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             setActiveTab(item.id);
                           }
                         }}
-                        className="bg-white border border-[#e2e8f0] hover:border-[#0088cc]/60 hover:shadow-md rounded-2xl p-5 transition-all cursor-pointer flex items-start justify-between gap-3 group"
+                        className="bg-white dark:bg-[#161f30] border border-[#e2e8f0] dark:border-[#1f293d] hover:border-[#0088cc]/60 hover:shadow-md rounded-2xl p-5 transition-all cursor-pointer flex items-start justify-between gap-3 group"
                       >
                         <div className="flex items-start gap-3.5">
                           <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${item.color} group-hover:scale-105 transition-transform`}>
                             <Icon className="w-5 h-5" />
                           </div>
                           <div>
-                            <h4 className="text-sm font-bold text-[#1e293b] group-hover:text-[#0088cc] transition-colors">
+                            <h4 className="text-sm font-bold text-[#1e293b] dark:text-white group-hover:text-[#0088cc] transition-colors">
                               {lang === 'bn' ? item.titleBn : item.titleEn}
                             </h4>
-                            <p className="text-xs text-[#64748b] mt-1 leading-relaxed">
+                            <p className="text-xs text-[#64748b] dark:text-[#94a3b8] mt-1 leading-relaxed">
                               {lang === 'bn' ? item.descBn : item.descEn}
                             </p>
                           </div>

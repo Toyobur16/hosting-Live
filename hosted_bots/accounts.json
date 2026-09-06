@@ -19,5 +19,16 @@
     "isVerified": true,
     "verificationToken": "795754eeb0b6ef81897776fc7b5eb63ae2626ebd4e52a50c",
     "verificationSentAt": "2026-09-06T20:28:12.221Z"
+  },
+  {
+    "id": "usr_1788729154130_27bfc649",
+    "name": "Admin User",
+    "email": "admin@cloud.com",
+    "salt": "b7f76aa7614b1950bbd8cb1672c92786",
+    "passwordHash": "3d27a4b8594eeff1e3291efb49f1ebf959b03fe21ce9cbc75c76e84c1995db437f5a9de25d05da9c7289ca60c3fdfdef374082709b13cea1f2687557ec22f037",
+    "createdAt": "2026-09-06T21:12:34.130Z",
+    "isVerified": true,
+    "verificationToken": "a496103ec80d0d961fb5fdba52e561a37a89dd48263db5ee",
+    "verificationSentAt": "2026-09-06T21:12:34.130Z"
   }
 ]

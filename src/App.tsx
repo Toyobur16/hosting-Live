@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Terminal, Bot, LogIn, CheckCircle2, Shield, X } from 'lucide-react';
+import { ArrowLeft, Terminal, Bot, LogIn, CheckCircle2, Shield, X, Sparkles } from 'lucide-react';
 import { Header } from './components/Header';
 import { BotList } from './components/BotList';
 import { LiveConsole } from './components/LiveConsole';
@@ -20,6 +20,25 @@ export default function App() {
   const [settingsInitialTab, setSettingsInitialTab] = useState<string>('overview');
   const [tokenModalData, setTokenModalData] = useState<any>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Dark Mode (টাক মোড) State
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('bot_theme');
+    return saved === 'dark' ? 'dark' : 'light';
+  });
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('bot_theme', theme);
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
@@ -234,7 +253,7 @@ export default function App() {
   const selectedBot = bots.find((b) => b.id === selectedBotId);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex flex-col selection:bg-[#0088cc] selection:text-white">
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-[#0a0e1a] text-[#1e293b] dark:text-[#f3f4f6] flex flex-col selection:bg-[#0088cc] selection:text-white transition-colors">
       {/* Header */}
       <Header
         bots={bots}
@@ -256,20 +275,22 @@ export default function App() {
         user={currentUser}
         onLogout={handleLogout}
         onOpenAuthModal={() => setShowAuthModal(true)}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
       />
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
         {/* Toast Notification */}
         {toastMessage && (
-          <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-xs flex items-center justify-between shadow-xs animate-in fade-in">
+          <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 rounded-2xl text-xs flex items-center justify-between shadow-xs animate-in fade-in">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span className="font-semibold">{toastMessage}</span>
             </div>
             <button
               onClick={() => setToastMessage(null)}
-              className="text-emerald-700 hover:text-emerald-950 p-1 cursor-pointer"
+              className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-950 dark:hover:text-white p-1 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -278,18 +299,18 @@ export default function App() {
 
         {/* Not Logged In Banner */}
         {!currentUser && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+          <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
                 <Shield className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-xs font-bold text-amber-900">
+                <h2 className="text-xs font-bold text-amber-900 dark:text-amber-200">
                   {lang === 'bn'
                     ? 'হোস্টিং শুরু করতে অনুগ্রহ করে লগইন বা রেজিস্ট্রেশন করুন'
                     : 'Please Sign In or Register to Manage Your Bots'}
                 </h2>
-                <p className="text-[11px] text-amber-700 mt-0.5">
+                <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">
                   {lang === 'bn'
                     ? 'প্রতিটি ইউজারের জন্য সম্পূর্ণ আলাদা ও নিরাপদ হোস্টিং পরিবেশ প্রদান করা হয়।'
                     : 'Each user gets an isolated and secure bot hosting environment.'}
@@ -308,7 +329,7 @@ export default function App() {
 
         {/* Terminal Navigation Bar if inside Terminal */}
         {activeTab === 'terminal' && (
-          <div className="flex items-center justify-between bg-white border border-[#e2e8f0] p-3 rounded-2xl shadow-xs">
+          <div className="flex items-center justify-between bg-white dark:bg-[#111827] border border-[#e2e8f0] dark:border-[#1f293d] p-3 rounded-2xl shadow-xs transition-colors">
             <button
               onClick={() => setActiveTab('bots')}
               className="px-4 py-2 rounded-xl bg-[#0088cc] hover:bg-[#0077b5] text-white text-xs font-bold flex items-center gap-2 shadow-xs cursor-pointer transition-all hover:scale-[1.01]"
@@ -318,10 +339,10 @@ export default function App() {
             </button>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[#64748b]">
+              <span className="text-xs font-semibold text-[#64748b] dark:text-[#94a3b8]">
                 {lang === 'bn' ? 'নির্বাচিত বট:' : 'Active Bot:'}
               </span>
-              <span className="text-xs font-bold text-[#1e293b] px-2.5 py-1 rounded-lg bg-[#f1f5f9]">
+              <span className="text-xs font-bold text-[#1e293b] dark:text-white px-2.5 py-1 rounded-lg bg-[#f1f5f9] dark:bg-[#1e293b]">
                 {selectedBot?.name || 'Bot'}
               </span>
             </div>
@@ -397,6 +418,11 @@ export default function App() {
         <NewBotModal
           isOpen={showNewBotModal}
           onClose={() => setShowNewBotModal(false)}
+          onCreated={(newBot) => {
+            fetchBots();
+            setSelectedBotId(newBot.id);
+            setShowNewBotModal(false);
+          }}
           onBotCreated={() => {
             fetchBots();
             setShowNewBotModal(false);
@@ -405,7 +431,7 @@ export default function App() {
         />
       )}
 
-      {/* Comprehensive High-Quality Settings Modal */}
+      {/* Comprehensive Settings Modal */}
       {showSettingsModal && (
         <SettingsModal
           isOpen={showSettingsModal}
@@ -423,35 +449,35 @@ export default function App() {
 
       {/* Token Verification Result Modal */}
       {tokenModalData && (
-        <div className="fixed inset-0 bg-[#050811]/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="bg-white border border-[#e2e8f0] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-[#f1f5f9] mb-4">
-              <h3 className="text-sm font-bold text-[#1e293b]">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="bg-white dark:bg-[#111827] border border-[#e2e8f0] dark:border-[#1f293d] rounded-2xl p-6 max-w-sm w-full shadow-2xl transition-colors">
+            <div className="flex items-center justify-between pb-3 border-b border-[#f1f5f9] dark:border-[#1f293d] mb-4">
+              <h3 className="text-sm font-bold text-[#1e293b] dark:text-white">
                 {lang === 'bn' ? 'টেলিগ্রাম বট টোকেন ফলাফল' : 'Telegram Bot Token Result'}
               </h3>
               <button
                 onClick={() => setTokenModalData(null)}
-                className="text-[#94a3b8] hover:text-[#1e293b] p-1 cursor-pointer"
+                className="text-[#94a3b8] hover:text-[#1e293b] dark:hover:text-white p-1 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
             {tokenModalData.ok ? (
               <div className="space-y-3 text-xs">
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 font-semibold flex items-center gap-2">
                   <span>✓ টোকেনটি সক্রিয় ও ভ্যালিড!</span>
                 </div>
-                <div className="space-y-1.5 bg-[#f8fafc] p-3.5 rounded-xl font-mono text-[11px] text-[#1e293b] border border-[#e2e8f0]">
-                  <div>Bot Name: <span className="text-[#1e293b] font-bold">{tokenModalData.result?.first_name}</span></div>
+                <div className="space-y-1.5 bg-[#f8fafc] dark:bg-[#1e293b] p-3.5 rounded-xl font-mono text-[11px] text-[#1e293b] dark:text-white border border-[#e2e8f0] dark:border-[#334155]">
+                  <div>Bot Name: <span className="text-[#1e293b] dark:text-white font-bold">{tokenModalData.result?.first_name}</span></div>
                   <div>Username: <span className="text-[#0088cc] font-semibold">@{tokenModalData.result?.username}</span></div>
-                  <div>ID: <span className="text-[#64748b]">{tokenModalData.result?.id}</span></div>
-                  <div>Can Join Groups: <span className="text-emerald-600 font-semibold">{String(tokenModalData.result?.can_join_groups)}</span></div>
+                  <div>ID: <span className="text-[#64748b] dark:text-[#94a3b8]">{tokenModalData.result?.id}</span></div>
+                  <div>Can Join Groups: <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{String(tokenModalData.result?.can_join_groups)}</span></div>
                 </div>
               </div>
             ) : (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800">
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-300">
                 <p className="font-bold">সতর্কবার্তা:</p>
-                <p className="mt-1 font-mono text-[11px] text-rose-700">
+                <p className="mt-1 font-mono text-[11px] text-rose-700 dark:text-rose-400">
                   {tokenModalData.description || (lang === 'bn' ? 'টোকেনটি সঠিক নয় বা সক্রিয় করা যায়নি' : 'Invalid bot token')}
                 </p>
               </div>
@@ -459,7 +485,7 @@ export default function App() {
             <div className="mt-5 flex justify-end">
               <button
                 onClick={() => setTokenModalData(null)}
-                className="px-4 py-2 bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#64748b] hover:text-[#1e293b] text-xs font-semibold rounded-xl border border-[#e2e8f0] cursor-pointer transition-colors"
+                className="px-4 py-2 bg-[#f8fafc] dark:bg-[#1e293b] hover:bg-[#f1f5f9] dark:hover:bg-[#334155] text-[#64748b] hover:text-[#1e293b] dark:text-[#94a3b8] dark:hover:text-white text-xs font-semibold rounded-xl border border-[#e2e8f0] dark:border-[#334155] cursor-pointer transition-colors"
               >
                 {lang === 'bn' ? 'বন্ধ করুন' : 'Close'}
               </button>
@@ -469,11 +495,11 @@ export default function App() {
       )}
 
       {/* Clean Footer */}
-      <footer className="px-8 py-4 bg-white border-t border-[#e2e8f0] text-[#94a3b8] text-xs flex flex-wrap items-center justify-between gap-2 mt-auto">
+      <footer className="px-8 py-4 bg-white dark:bg-[#111827] border-t border-[#e2e8f0] dark:border-[#1f293d] text-[#94a3b8] text-xs flex flex-wrap items-center justify-between gap-2 mt-auto transition-colors">
         <span>&copy; Bot-Host • Free Unlimited Telegram Bot Cloud Hosting</span>
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>২৪/৭ ক্লাউড অটো-রানিং ইঞ্জিন: <span className="text-emerald-600 font-bold uppercase tracking-wider">সক্রিয় (Active)</span></span>
+          <span>২৪/৭ ক্লাউড অটো-রানিং ইঞ্জিন: <span className="text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">সক্রিয় (Active)</span></span>
         </span>
       </footer>
     </div>

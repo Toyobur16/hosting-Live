@@ -1,1 +1,17 @@
-[]
+[
+  {
+    "id": "fast-live-bot-dmc1u",
+    "name": "Fast Live Bot",
+    "entryFile": "bot.py",
+    "ownerId": "usr_1788729154130_27bfc649",
+    "ownerName": "Admin User",
+    "token": "",
+    "botUsername": "",
+    "status": "running",
+    "createdAt": "2026-09-06T21:12:38.606Z",
+    "autoRestart": true,
+    "env": {
+      "BASE_URL": "https://minosms.com"
+    }
+  }
+]
